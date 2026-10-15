@@ -1,0 +1,12 @@
+[
+  {"wait":"[Extensions]"},
+  {"idle":2500},
+  {"send":"/reload"},
+  {"send":"\r"},
+  {"idle":4000},
+  {"shot":"reloaded"},
+  {"send":"/new"},
+  {"send":"\r"},
+  {"idle":3000},
+  {"shot":"newsession"}
+]
