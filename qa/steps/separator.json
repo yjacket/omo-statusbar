@@ -1,0 +1,14 @@
+[
+  {"wait":"[Extensions]"},
+  {"idle":2500},
+  {"send":"/status-arrange"},
+  {"send":"\r"},
+  {"wait":"상태줄 정리"},
+  {"send":"p"},
+  {"idle":600},
+  {"shot":"preview"},
+  {"send":"s"},
+  {"send":"q"},
+  {"idle":800},
+  {"shot":"closed"}
+]

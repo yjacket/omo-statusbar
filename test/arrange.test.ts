@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { arrangeStatuses, emptyConfig, mergeKeys } from "../extension/status-arrange/arrange.ts";
+import { arrangeStatuses, emptyConfig, GIT_ICONS, mergeKeys, SEPARATORS } from "../extension/status-arrange/arrange.ts";
 
 const byLocale = (a: string, b: string): number => a.localeCompare(b);
 
@@ -85,6 +85,48 @@ describe("arrangeStatuses", () => {
 		const expectedKeys = Array.from({ length: 12 }, (_, i) => String(i).padStart(4, "0"));
 		expect(keys).toEqual(expectedKeys);
 		expect([...keys].sort(byLocale)).toEqual(expectedKeys);
+	});
+});
+
+describe("arrangeStatuses separators", () => {
+	const statuses = new Map([
+		["a", "A"],
+		["b", "B"],
+		["c", "C"],
+	]);
+	const order = ["a", "b", "c"];
+
+	test("space keeps the text unchanged", () => {
+		expect([...arrangeStatuses(statuses, order, new Set(), "space").values()]).toEqual(["A", "B", "C"]);
+	});
+
+	test("pipe prefixes every item after the first", () => {
+		expect([...arrangeStatuses(statuses, order, new Set(), "pipe").values()]).toEqual(["A", "| B", "| C"]);
+	});
+
+	test("dot prefixes every item after the first", () => {
+		expect([...arrangeStatuses(statuses, order, new Set(), "dot").values()]).toEqual(["A", "· B", "· C"]);
+	});
+
+	test("slash prefixes every item after the first", () => {
+		expect([...arrangeStatuses(statuses, order, new Set(), "slash").values()]).toEqual(["A", "/ B", "/ C"]);
+	});
+
+	test("brackets wrap every item", () => {
+		expect([...arrangeStatuses(statuses, order, new Set(), "brackets").values()]).toEqual(["[A]", "[B]", "[C]"]);
+	});
+
+	test("hidden items are not counted for the prefix", () => {
+		expect([...arrangeStatuses(statuses, order, new Set(["a"]), "pipe").values()]).toEqual(["B", "| C"]);
+	});
+
+	test("the default separator is space", () => {
+		expect([...arrangeStatuses(statuses, order, new Set()).values()]).toEqual(["A", "B", "C"]);
+	});
+
+	test("exports the separator and git-icon lists", () => {
+		expect(SEPARATORS).toEqual(["space", "pipe", "dot", "slash", "brackets"]);
+		expect(GIT_ICONS).toEqual(["plain", "emoji", "nerd"]);
 	});
 });
 

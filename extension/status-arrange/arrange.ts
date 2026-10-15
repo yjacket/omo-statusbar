@@ -1,4 +1,15 @@
-export type Config = { version: 1; order: string[]; hidden: string[] };
+export type Separator = "space" | "pipe" | "dot" | "slash" | "brackets";
+export type GitIcon = "plain" | "emoji" | "nerd";
+export type Config = {
+	version: 1;
+	order: string[];
+	hidden: string[];
+	separator?: Separator;
+	gitIcon?: GitIcon;
+};
+
+export const SEPARATORS: readonly Separator[] = ["space", "pipe", "dot", "slash", "brackets"];
+export const GIT_ICONS: readonly GitIcon[] = ["plain", "emoji", "nerd"];
 
 export function emptyConfig(): Config {
 	return { version: 1, order: [], hidden: [] };
@@ -24,16 +35,33 @@ export function mergeKeys(order: readonly string[], keys: Iterable<string>): str
 	return result;
 }
 
+const PREFIX: Record<Separator, string | undefined> = {
+	space: undefined,
+	pipe: "|",
+	dot: "·",
+	slash: "/",
+	brackets: undefined,
+};
+
 export function arrangeStatuses(
 	statuses: ReadonlyMap<string, string>,
 	order: readonly string[],
 	hidden: ReadonlySet<string>,
+	separator: Separator = "space",
 ): Map<string, string> {
 	const full = mergeKeys(order, statuses.keys());
 	const result = new Map<string, string>();
 	for (const key of full) {
 		if (!statuses.has(key) || hidden.has(key)) continue;
-		result.set(String(result.size).padStart(4, "0"), statuses.get(key) as string);
+		const index = result.size;
+		const text = statuses.get(key) as string;
+		let value = text;
+		if (separator === "brackets") value = `[${text}]`;
+		else if (index > 0) {
+			const ch = PREFIX[separator];
+			if (ch !== undefined) value = `${ch} ${text}`;
+		}
+		result.set(String(index).padStart(4, "0"), value);
 	}
 	return result;
 }

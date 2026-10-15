@@ -1,7 +1,8 @@
 import { getAgentDir } from "@code-yeongyu/senpi";
-import { type Config, arrangeStatuses, emptyConfig, mergeKeys } from "./arrange.ts";
+import { arrangeStatuses, type Config, emptyConfig, mergeKeys } from "./arrange.ts";
 import { configPath, loadConfig, saveConfig } from "./config.ts";
-import { StatusPicker } from "./picker.ts";
+import { GIT_STATUS_KEY, gitStatusText, readChangeCount } from "./git.ts";
+import { type PickerState, StatusPicker } from "./picker.ts";
 
 const PATCH = Symbol.for("omo-status-arrange.patch");
 const EDITOR_OVERLAY = { width: "96%", maxHeight: "80%", minWidth: 40, margin: 1 } as const;
@@ -18,10 +19,13 @@ function errorText(error: unknown): string {
 export function createStatusArrange(pi: any, deps: { agentDir?: () => string } = {}): void {
 	let config: Config = emptyConfig();
 	let configFile: string | undefined;
-	let preview: { order: string[]; hidden: string[] } | undefined;
+	let preview: PickerState | undefined;
 	let provider: any;
 	let tui: any;
 	let lastStatuses = new Map<string, string>();
+	let lastGitCount: number | undefined;
+	let gitRunning = false;
+	let gitRerun = false;
 	let notify: ((message: string, level: "warning" | "error") => void) | undefined;
 	const warned = new Set<string>();
 	let dirty = false;
@@ -59,13 +63,56 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 	}
 
 	function arrange(statuses: Map<string, string>): Map<string, string> {
-		lastStatuses = new Map(statuses);
+		let effective = statuses;
+		if (statuses.has(GIT_STATUS_KEY) && lastGitCount !== undefined) {
+			const text = gitStatusText(lastGitCount, preview?.gitIcon ?? config.gitIcon ?? "plain");
+			if (text !== undefined) {
+				effective = new Map(statuses);
+				effective.set(GIT_STATUS_KEY, text);
+			}
+		}
+		lastStatuses = new Map(effective);
 		const order = mergeKeys(config.order, statuses.keys());
 		if (order !== config.order) {
 			config = { ...config, order };
 			scheduleSave();
 		}
-		return arrangeStatuses(statuses, preview?.order ?? config.order, new Set(preview?.hidden ?? config.hidden));
+		return arrangeStatuses(
+			effective,
+			preview?.order ?? config.order,
+			new Set(preview?.hidden ?? config.hidden),
+			preview?.separator ?? config.separator ?? "space",
+		);
+	}
+
+	// The only place git runs: session_start and agent_settled. Runs coalesce, so a burst
+	// of settled events never queues more than one git call behind the current one.
+	async function refreshGit(ctx: any): Promise<void> {
+		if (!ctx?.hasUI || ctx.mode !== "tui") return;
+		if (gitRunning) {
+			gitRerun = true;
+			return;
+		}
+		gitRunning = true;
+		try {
+			do {
+				gitRerun = false;
+				const count = await readChangeCount(
+					(command: string, args: string[], options: { cwd: string; timeout?: number }) => pi.exec(command, args, options),
+					ctx.cwd,
+				);
+				lastGitCount = count;
+				try {
+					ctx.ui.setStatus(GIT_STATUS_KEY, gitStatusText(count, config.gitIcon ?? "plain"));
+				} catch {
+					// a stale ctx throws: there is nothing left to update
+				}
+			} while (gitRerun);
+		} catch {
+			// fired and forgotten: this must never reject
+		} finally {
+			gitRunning = false;
+		}
 	}
 
 	function patch(target: any): void {
@@ -105,15 +152,22 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 
 			if (typeof captured.data?.getExtensionStatuses !== "function") {
 				warnOnce("status-arrange: this omo version does not expose footer statuses; the footer is left as is");
+				void refreshGit(ctx);
 				return;
 			}
 			provider = captured.data;
 			tui = captured.tui;
 			patch(provider);
 			tui?.requestRender?.();
+			void refreshGit(ctx);
 		} catch (error) {
 			warnOnce(`status-arrange: cannot start (${errorText(error)}); the footer is left as is`);
+			void refreshGit(ctx);
 		}
+	});
+
+	pi.on("agent_settled", (_event: unknown, ctx: any) => {
+		void refreshGit(ctx);
 	});
 
 	pi.on("session_shutdown", () => {
@@ -124,6 +178,7 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 			delete provider[PATCH];
 		}
 		preview = undefined;
+		lastGitCount = undefined;
 		provider = undefined;
 		tui = undefined;
 	});
@@ -144,21 +199,33 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 					new StatusPicker(theme, {
 						order: [...config.order],
 						hidden: [...config.hidden],
+						separator: config.separator ?? "space",
+						gitIcon: config.gitIcon ?? "plain",
 						statuses: () => lastStatuses,
 						keybindings,
-						onPreview: (order, hidden) => {
-							preview = { order, hidden };
+						onPreview: (state: PickerState) => {
+							preview = state;
 							tui?.requestRender?.();
 						},
-						onSave: (order, hidden) => {
+						onSave: (state: PickerState) => {
+							const next: Config = { version: 1, order: [...state.order], hidden: [...state.hidden] };
+							if (state.separator !== "space") next.separator = state.separator;
+							if (state.gitIcon !== "plain") next.gitIcon = state.gitIcon;
 							try {
-								saveConfig(configFile as string, { version: 1, order, hidden });
+								saveConfig(configFile as string, next);
 							} catch (error) {
 								return `status-arrange: cannot save (${errorText(error)})`;
 							}
-							config = { version: 1, order, hidden };
+							config = next;
 							dirty = false;
 							preview = undefined;
+							try {
+								if (lastGitCount !== undefined) {
+									ctx.ui.setStatus(GIT_STATUS_KEY, gitStatusText(lastGitCount, state.gitIcon));
+								}
+							} catch {
+								// a stale ctx throws: the save itself already stands
+							}
 							return undefined;
 						},
 						onClose: () => {

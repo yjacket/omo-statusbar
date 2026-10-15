@@ -53,3 +53,49 @@ test("normalizes string arrays, keeping first occurrences", () => {
 		hidden: ["x"],
 	});
 });
+
+describe("optional separator and gitIcon", () => {
+	test("round-trips every valid value through saveConfig and loadConfig", () => {
+		const path = setup();
+		for (const separator of ["space", "pipe", "dot", "slash", "brackets"] as const) {
+			for (const gitIcon of ["plain", "emoji", "nerd"] as const) {
+				const config = { version: 1 as const, order: ["  omo-native", "goal"], hidden: [], separator, gitIcon };
+				saveConfig(path, config);
+				expect(loadConfig(path)).toEqual({ config });
+			}
+		}
+	});
+
+	test("keeps the documented field order", () => {
+		const path = setup();
+		saveConfig(path, { version: 1, order: ["a"], hidden: ["b"], separator: "dot", gitIcon: "nerd" });
+		expect(Object.keys(JSON.parse(readFileSync(path, "utf8")))).toEqual([
+			"version",
+			"order",
+			"hidden",
+			"separator",
+			"gitIcon",
+		]);
+	});
+
+	test("drops wrong types and unknown strings without error", () => {
+		const path = setup();
+		writeFileSync(path, '{"order":["a"],"hidden":[],"separator":"weird","gitIcon":3}');
+		expect(loadConfig(path)).toEqual({ config: { version: 1, order: ["a"], hidden: [] } });
+		expect(normalizeConfig({ separator: "space", gitIcon: "emoji" })).toEqual({
+			version: 1,
+			order: [],
+			hidden: [],
+			separator: "space",
+			gitIcon: "emoji",
+		});
+		expect(normalizeConfig({ separator: "SPACE", gitIcon: "" })).toEqual({ version: 1, order: [], hidden: [] });
+		expect(normalizeConfig({ separator: null, gitIcon: ["nerd"] })).toEqual({ version: 1, order: [], hidden: [] });
+	});
+
+	test("loads old files without the optional fields", () => {
+		const path = setup();
+		writeFileSync(path, '{"version":1,"order":["goal"],"hidden":[]}');
+		expect(loadConfig(path)).toEqual({ config: { version: 1, order: ["goal"], hidden: [] } });
+	});
+});

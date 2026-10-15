@@ -6,8 +6,11 @@ import { displayWidth } from "../extension/status-arrange/text.ts";
 
 const root = resolve(import.meta.dirname, "..");
 const qa = join(root, "qa");
-const config = join(process.env.OMO_CODING_AGENT_DIR || join(homedir(), ".omo", "agent"), "status-arrange.json");
+const agentDir = process.env.OMO_CODING_AGENT_DIR || join(homedir(), ".omo", "agent");
+const config = join(agentDir, "status-arrange.json");
 const backup = `${config}.qa-backup`;
+const installedExt = join(agentDir, "extensions", "status-arrange");
+const movedExt = join(agentDir, "status-arrange.qa-moved-ext");
 const fixture = "qa/fixtures/qa-statuses.ts";
 const dualExt = "extension/status-arrange/index.ts;qa/fixtures/qa-statuses.ts";
 const scenarios = [
@@ -17,6 +20,7 @@ const scenarios = [
 	"S4-newkey", "S5-discard",
 	"S6-reload", "S7-corrupt",
 	"S8-narrow", "S9-print",
+	"S10-separator", "S10-persist", "S11-git",
 ];
 const args = process.argv.slice(2);
 const list = args.includes("--list");
@@ -49,18 +53,27 @@ const run = (command, args, options = {}) => spawnSync(command, args, {
 
 const shared = mkdtempSync(join(tmpdir(), "status-arrange-qa-"));
 let hadConfig = false;
+let movedExtBack = false;
+let gitDir;
 let failures = 0;
 try {
+	// An installed copy would load into every scenario, including S1-control, so it is parked outside
+	// extensions/ for the whole run; only the --ext copies below load.
+	if (existsSync(movedExt)) throw new Error(`qa-moved-ext already exists: ${movedExt}`);
+	if (existsSync(installedExt)) {
+		renameSync(installedExt, movedExt);
+		movedExtBack = true;
+	}
 	if (existsSync(backup)) throw new Error(`backup already exists: ${backup}`);
 	if (existsSync(config)) {
 		hadConfig = true;
 		renameSync(config, backup);
 	}
 
-	const execute = (name, steps, ext, extra = []) => {
+	const execute = (name, steps, ext, extra = [], cwd = shared) => {
 		const out = `.omo/evidence/${name}`;
 		const result = run("bun", [
-			"qa/tui-qa.mjs", "--cwd", shared, "--steps", `qa/steps/${steps}.json`,
+			"qa/tui-qa.mjs", "--cwd", cwd, "--steps", `qa/steps/${steps}.json`,
 			"--out", out, "--ext", ext, ...extra,
 		]);
 		if (result.status !== 0) throw new Error(result.stderr || result.stdout || `harness exited ${result.status}`);
@@ -155,11 +168,40 @@ try {
 		assert(result.status === 0, `print command exited ${result.status}`);
 		assert(!/status-arrange[\s\S]*?(?:Error|at )/.test(result.stderr), "status-arrange stack trace in stderr");
 	});
+	// Installed extensions (og-promo, omo-health) may publish between the fixture items, so each QA item
+	// is checked for its own "| " prefix instead of requiring the two to be adjacent.
+	const piped = (line) => line.includes("| QA-A") && line.includes("| QA-Z");
+	await scenario("S10-separator", () => {
+		execute("S10-separator", "separator", dualExt);
+		assert(piped(line2("S10-separator", "preview")), "preview does not use the pipe separator");
+		assert(piped(line2("S10-separator", "closed")), "closed footer does not use the pipe separator");
+		assert(JSON.parse(readFileSync(config, "utf8")).separator === "pipe", "config does not save separator pipe");
+	});
+	await scenario("S10-persist", () => {
+		execute("S10-persist", "baseline", dualExt);
+		assert(piped(line2("S10-persist")), "separator did not persist");
+	});
+	await scenario("S11-git", () => {
+		gitDir = mkdtempSync(join(tmpdir(), "status-arrange-git-"));
+		const init = run("git", ["init", "-q"], { cwd: gitDir });
+		assert(init.status === 0, `git init exited ${init.status}`);
+		writeFileSync(join(gitDir, "a.txt"), "a\n");
+		writeFileSync(join(gitDir, "b.txt"), "b\n");
+		const status = run("git", ["status", "--porcelain"], { cwd: gitDir });
+		assert(status.stdout.trim().split(/\r?\n/).length === 2, `git status --porcelain is not 2 lines: ${status.stdout}`);
+		execute("S11-git", "git", dualExt, [], gitDir);
+		assert(line2("S11-git").includes("± 2"), "footer does not show the dirty count");
+		assert(line2("S11-git", "preview").includes("📝 2"), "preview does not use the emoji git icon");
+		assert(line2("S11-git", "closed").includes("📝 2"), "closed footer does not use the emoji git icon");
+		assert(JSON.parse(readFileSync(config, "utf8")).gitIcon === "emoji", "config does not save gitIcon emoji");
+	});
 } catch (error) {
 	failures++;
 	console.log(`FAIL setup: ${error.message}`);
 } finally {
 	rmSync(shared, { recursive: true, force: true });
+	if (gitDir) rmSync(gitDir, { recursive: true, force: true });
+	if (movedExtBack && existsSync(movedExt)) renameSync(movedExt, installedExt);
 	if (existsSync(config)) rmSync(config, { force: true });
 	if (hadConfig && existsSync(backup)) {
 		renameSync(backup, config);

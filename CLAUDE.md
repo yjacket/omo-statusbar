@@ -4,7 +4,7 @@ This file guides Claude Code (claude.ai/code) in this repository.
 
 ## What this is
 
-`extension/status-arrange/` is an OMO/Senpi extension, installed as `<agentDir>/extensions/status-arrange/`. It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/status-arrange` opens an editor, and settings live in `<agentDir>/status-arrange.json` (`{ version: 1, order: string[], hidden: string[] }`). README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
+`extension/status-arrange/` is an OMO/Senpi extension, installed as `<agentDir>/extensions/status-arrange/`. It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/status-arrange` opens an editor, and settings live in `<agentDir>/status-arrange.json` (`{ version: 1, order: string[], hidden: string[], separator?, gitIcon? }`). It also publishes its own `omo-git` status (uncommitted file count). README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
 
 ## Commands
 
@@ -14,6 +14,8 @@ bun qa/run-qa.mjs
 bun qa/run-qa.mjs --only S2-hide
 sh install.sh   |   .\install.ps1
 ```
+
+`run-qa` moves an installed copy out of `extensions/` for the run and puts it back afterwards.
 
 ## Senpi facts this relies on
 
@@ -30,6 +32,7 @@ sh install.sh   |   .\install.ps1
 - Restore the original provider on `session_shutdown`.
 - No IO in render. Settings are read on load and written on save.
 - Status keys are kept byte-exact, leading spaces included.
+- git runs only on `session_start` and `agent_settled`, never in render. Its status key is `omo-git`.
 
 ## Testing
 

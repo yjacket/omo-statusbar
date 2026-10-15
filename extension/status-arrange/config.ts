@@ -2,7 +2,18 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-export type Config = { version: 1; order: string[]; hidden: string[] };
+export type Separator = "space" | "pipe" | "dot" | "slash" | "brackets";
+export type GitIcon = "plain" | "emoji" | "nerd";
+export type Config = {
+	version: 1;
+	order: string[];
+	hidden: string[];
+	separator?: Separator;
+	gitIcon?: GitIcon;
+};
+
+const SEPARATORS: readonly Separator[] = ["space", "pipe", "dot", "slash", "brackets"];
+const GIT_ICONS: readonly GitIcon[] = ["plain", "emoji", "nerd"];
 
 export const CONFIG_FILE = "status-arrange.json";
 
@@ -29,11 +40,14 @@ export function normalizeConfig(raw: unknown): Config | undefined {
 	if (("order" in value && !Array.isArray(value.order)) || ("hidden" in value && !Array.isArray(value.hidden))) {
 		return undefined;
 	}
-	return {
+	const config: Config = {
 		version: 1,
 		order: uniqueStrings(Array.isArray(value.order) ? value.order : []),
 		hidden: uniqueStrings(Array.isArray(value.hidden) ? value.hidden : []),
 	};
+	if ((SEPARATORS as readonly unknown[]).includes(value.separator)) config.separator = value.separator as Separator;
+	if ((GIT_ICONS as readonly unknown[]).includes(value.gitIcon)) config.gitIcon = value.gitIcon as GitIcon;
+	return config;
 }
 
 export function loadConfig(path: string): { config: Config; error?: string } {

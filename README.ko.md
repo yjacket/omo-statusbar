@@ -33,6 +33,8 @@ git clone https://github.com/yjacket/omo-status-arrange && sh omo-status-arrange
 | `T` / `B` | 항목을 맨 위 / 맨 아래로 옮기기 |
 | `r` | 기본 순서로 되돌리기 |
 | `d` | 지금 표시되지 않는 항목 지우기 |
+| `p` | 구분자 바꾸기: 공백, `\|`, `·`, `/`, `[]`(항목마다 감쌈) |
+| `g` | git 아이콘 바꾸기: `±`, `📝`, Nerd Font 글리프 U+E702(터미널 글꼴이 Nerd Font여야 함) |
 | `s` | 저장 |
 | `q` / `Esc` | 닫기. 저장하지 않은 변경이 있으면 한 번 묻습니다 |
 
@@ -40,17 +42,21 @@ git clone https://github.com/yjacket/omo-status-arrange && sh omo-status-arrange
 
 senpi는 푸터 상태를 키 순서로 정렬합니다. 이 확장은 푸터의 상태 소스를 감싸고, 고른 순서대로 정렬되도록 키 이름을 바꿉니다. 처음 보는 항목은 알파벳 순서상 바로 앞 항목 뒤에 나옵니다.
 
+이 확장은 자기 상태 `omo-git`도 올립니다. 표시는 `± N`이고, N은 `git status --porcelain` 기준 커밋하지 않은 파일 수입니다(수정, 스테이징, 추적 안 됨 포함). 세션을 시작할 때와 답이 끝날 때마다 갱신되고, 작업 트리가 깨끗하거나 저장소가 아니면 숨겨집니다. 다른 상태처럼 편집기에서 옮기거나 숨길 수 있습니다. 항목 사이 구분자는 omo가 아니라 이 확장이 넣습니다.
+
 설정은 `<agentDir>/status-arrange.json`에 저장됩니다:
 
 ```json
 {
 	"version": 1,
 	"order": ["cache-ttl", "  omo-native", "goal"],
-	"hidden": ["og-promo"]
+	"hidden": ["og-promo"],
+	"separator": "pipe",
+	"gitIcon": "plain"
 }
 ```
 
-키는 앞 공백까지 확장이 정한 그대로 저장됩니다. 이 파일은 omo 런타임 밖에 있어서 omo나 omo-ai를 업데이트해도 남아 있습니다.
+키는 앞 공백까지 확장이 정한 그대로 저장됩니다. 이 파일은 omo 런타임 밖에 있어서 omo나 omo-ai를 업데이트해도 남아 있습니다. `separator`나 `gitIcon`이 없으면 공백과 `±`를 씁니다.
 
 ## 제한
 
