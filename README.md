@@ -9,16 +9,16 @@ The second line of omo's footer lists status items from your extensions, sorted 
 Windows (PowerShell):
 
 ```powershell
-git clone https://github.com/yjacket/omo-status-arrange; .\omo-status-arrange\install.ps1
+irm https://raw.githubusercontent.com/yjacket/omo-status-arrange/master/install.ps1 | iex
 ```
 
 Linux, macOS:
 
 ```sh
-git clone https://github.com/yjacket/omo-status-arrange && sh omo-status-arrange/install.sh
+curl -fsSL https://raw.githubusercontent.com/yjacket/omo-status-arrange/master/install.sh | sh
 ```
 
-From an existing clone, run `.\install.ps1` or `sh install.sh`. The script copies `extension/status-arrange` into `~/.omo/agent/extensions/status-arrange`, or into the folder named by `OMO_CODING_AGENT_DIR`. Then type `/reload` in any running session.
+The script downloads the latest `master` and copies `extension/status-arrange` into `~/.omo/agent/extensions/status-arrange`, or into the folder named by `OMO_CODING_AGENT_DIR`. Then type `/reload` in any running session. From a clone, run `.\install.ps1` or `sh install.sh` to install that checkout without downloading.
 
 ## Usage
 

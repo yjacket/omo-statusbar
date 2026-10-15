@@ -9,16 +9,16 @@ omo 푸터의 두 번째 줄에는 확장들이 올린 상태 항목이 키 순�
 Windows (PowerShell):
 
 ```powershell
-git clone https://github.com/yjacket/omo-status-arrange; .\omo-status-arrange\install.ps1
+irm https://raw.githubusercontent.com/yjacket/omo-status-arrange/master/install.ps1 | iex
 ```
 
 Linux, macOS:
 
 ```sh
-git clone https://github.com/yjacket/omo-status-arrange && sh omo-status-arrange/install.sh
+curl -fsSL https://raw.githubusercontent.com/yjacket/omo-status-arrange/master/install.sh | sh
 ```
 
-이미 클론해 두었다면 `.\install.ps1` 또는 `sh install.sh`를 실행하세요. 스크립트는 `extension/status-arrange`를 `~/.omo/agent/extensions/status-arrange`에 복사합니다. `OMO_CODING_AGENT_DIR`이 설정되어 있으면 그 폴더에 복사합니다. 복사가 끝나면 실행 중인 세션에서 `/reload`를 입력하세요.
+스크립트는 최신 `master`를 내려받아 `extension/status-arrange`를 `~/.omo/agent/extensions/status-arrange`에 복사합니다. `OMO_CODING_AGENT_DIR`이 설정되어 있으면 그 폴더에 복사합니다. 복사가 끝나면 실행 중인 세션에서 `/reload`를 입력하세요. 클론에서 `.\install.ps1` 또는 `sh install.sh`를 실행하면 내려받지 않고 그 체크아웃을 설치합니다.
 
 ## 사용법
 
