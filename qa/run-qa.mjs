@@ -9,10 +9,9 @@ const qa = join(root, "qa");
 const agentDir = process.env.OMO_CODING_AGENT_DIR || join(homedir(), ".omo", "agent");
 const config = join(agentDir, "statusbar.json");
 const backup = `${config}.qa-backup`;
-const installedExt = join(agentDir, "git", "github.com", "yjacket", "omo-statusbar");
-const movedExt = join(agentDir, "statusbar.qa-moved-package");
-// With its checkout parked, offline mode keeps omo from cloning the package again at start-up.
-process.env.OMO_OFFLINE = process.env.SENPI_OFFLINE = process.env.PI_OFFLINE = "1";
+// A status-arrange.json from before the rename is read when statusbar.json is missing, so it is parked too.
+const legacy = join(agentDir, "status-arrange.json");
+const legacyBackup = `${legacy}.qa-backup`;
 const fixture = "qa/fixtures/qa-statuses.ts";
 const dualExt = "extension/statusbar/index.ts;qa/fixtures/qa-statuses.ts";
 const scenarios = [
@@ -44,7 +43,9 @@ if (list) {
 
 const evidence = (name) => join(root, ".omo", "evidence", name);
 const footer = (path) => readFileSync(path, "utf8").split(/\r?\n/).filter((line) => line.trim()).slice(-2);
-const line2 = (name, shot = "footer") => footer(join(evidence(name), `${shot}.txt`))[1] || "";
+// The extension's own omo-cache status (🔥 52m / 🧊 / 🧊 12m) depends on the clock, so it is dropped before comparing.
+const withoutCache = (line) => line.replace(/\s*(?:[|·/]\s*)?\[?(?:🔥 \d+m|🧊(?: \d+[mh])?)\]?/gu, "").trim();
+const line2 = (name, shot = "footer") => withoutCache(footer(join(evidence(name), `${shot}.txt`))[1] || "");
 const readText = (name, file) => readFileSync(join(evidence(name), `${file}.txt`), "utf8");
 const assert = (condition, reason) => { if (!condition) throw new Error(reason); };
 const run = (command, args, options = {}) => spawnSync(command, args, {
@@ -55,18 +56,16 @@ const run = (command, args, options = {}) => spawnSync(command, args, {
 
 const shared = mkdtempSync(join(tmpdir(), "statusbar-qa-"));
 let hadConfig = false;
-let movedExtBack = false;
+let hadLegacy = false;
 let gitDir;
 let failures = 0;
 try {
-	// The installed package would load into every scenario, including S1-control, so its checkout is
-	// parked for the whole run; only the --ext copies below load.
-	if (existsSync(movedExt)) throw new Error(`qa-moved-ext already exists: ${movedExt}`);
-	if (existsSync(installedExt)) {
-		renameSync(installedExt, movedExt);
-		movedExtBack = true;
-	}
 	if (existsSync(backup)) throw new Error(`backup already exists: ${backup}`);
+	if (existsSync(legacyBackup)) throw new Error(`backup already exists: ${legacyBackup}`);
+	if (existsSync(legacy)) {
+		hadLegacy = true;
+		renameSync(legacy, legacyBackup);
+	}
 	if (existsSync(config)) {
 		hadConfig = true;
 		renameSync(config, backup);
@@ -164,7 +163,7 @@ try {
 	});
 	await scenario("S9-print", () => {
 		const result = run("bun", [
-			"C:/Users/yjack/.bun/install/global/node_modules/omo-ai/bin/omo.js", "--no-session",
+			"C:/Users/yjack/.bun/install/global/node_modules/omo-ai/bin/omo.js", "--no-session", "--no-extensions",
 			"-e", "extension/statusbar/index.ts", "-p", "Reply with exactly: ok",
 		], { timeout: 120000 });
 		assert(result.status === 0, `print command exited ${result.status}`);
@@ -203,10 +202,10 @@ try {
 } finally {
 	rmSync(shared, { recursive: true, force: true });
 	if (gitDir) rmSync(gitDir, { recursive: true, force: true });
-	if (movedExtBack && existsSync(movedExt)) renameSync(movedExt, installedExt);
 	if (existsSync(config)) rmSync(config, { force: true });
 	if (hadConfig && existsSync(backup)) {
 		renameSync(backup, config);
 	}
+	if (hadLegacy && existsSync(legacyBackup) && !existsSync(legacy)) renameSync(legacyBackup, legacy);
 }
 process.exitCode = failures ? 1 : 0;

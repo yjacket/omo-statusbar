@@ -164,7 +164,9 @@ async function main() {
   const steps = JSON.parse(readFileSync(resolve(args.steps), "utf8"));
   mkdirSync(out, { recursive: true });
 
-  const cmd = ["bun", OMO_JS, "--no-session"];
+  // --no-extensions drops discovered and package extensions (an installed omo-statusbar among them)
+  // but keeps omo's builtins, so only the --ext files under test add to the footer.
+  const cmd = ["bun", OMO_JS, "--no-session", "--no-extensions"];
   if (args.ext) for (const ext of args.ext.split(";").filter(Boolean)) cmd.push("-e", resolve(ext)); // load extension files under test without installing them
   const env = { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" };
   if (args.editor) env.VISUAL = args.editor;
