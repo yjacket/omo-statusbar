@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { arrangeStatuses, emptyConfig, GIT_ICONS, mergeKeys, SEPARATORS } from "../extension/status-arrange/arrange.ts";
+import { arrangeStatuses, emptyConfig, GIT_ICONS, mergeKeys, SEPARATORS } from "../extension/statusbar/arrange.ts";
 
 const byLocale = (a: string, b: string): number => a.localeCompare(b);
 

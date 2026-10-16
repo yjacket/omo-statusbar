@@ -2,18 +2,19 @@ import { afterAll, afterEach, beforeEach, describe, expect, jest, mock, test } f
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CONFIG_FILE } from "../extension/status-arrange/config.ts";
+import { CONFIG_FILE } from "../extension/statusbar/config.ts";
 // the genuine picker, captured before the mock below replaces it in the module registry
-import * as realPicker from "../extension/status-arrange/picker.ts";
+import * as realPicker from "../extension/statusbar/picker.ts";
 
-const PATCH = Symbol.for("omo-status-arrange.patch");
+const PATCH = Symbol.for("omo-statusbar.patch");
 let agentDir = "";
 
 mock.module("@code-yeongyu/senpi", () => ({ getAgentDir: () => agentDir }));
+mock.module("@earendil-works/pi-ai", () => ({ resolvePromptCacheTtlSeconds: () => undefined }));
 
 // The picker itself is another file's subject; here it only records the options it was built with.
 let pickerOptions: any;
-mock.module("../extension/status-arrange/picker.ts", () => ({
+mock.module("../extension/statusbar/picker.ts", () => ({
 	StatusPicker: class extends realPicker.StatusPicker {
 		constructor(theme: any, options: any) {
 			super(theme, options);
@@ -72,9 +73,9 @@ function fakeCtx(provider: FakeProvider, mode = "tui") {
 }
 
 async function load(name: string) {
-	const mod = await import(`../extension/status-arrange/index.ts?case=${name}`);
+	const mod = await import(`../extension/statusbar/index.ts?case=${name}`);
 	const pi = fakePi();
-	mod.createStatusArrange(pi);
+	mod.createStatusbar(pi);
 	return pi;
 }
 
@@ -85,11 +86,11 @@ const configFile = () => join(agentDir, CONFIG_FILE);
 
 // mock.module is process-wide: put the real picker back so the other suites see it
 afterAll(() => {
-	mock.module("../extension/status-arrange/picker.ts", () => realPicker);
+	mock.module("../extension/statusbar/picker.ts", () => realPicker);
 });
 
 beforeEach(() => {
-	agentDir = mkdtempSync(join(tmpdir(), "status-arrange-index-"));
+	agentDir = mkdtempSync(join(tmpdir(), "statusbar-index-"));
 	pickerOptions = undefined;
 });
 
@@ -98,7 +99,7 @@ afterEach(() => {
 	rmSync(agentDir, { recursive: true, force: true });
 });
 
-describe("status-arrange wiring", () => {
+describe("statusbar wiring", () => {
 	test("orders statuses by default after session_start", async () => {
 		const pi = await load("default");
 		const provider = new FakeProvider();
@@ -124,6 +125,19 @@ describe("status-arrange wiring", () => {
 		const statuses = provider.getExtensionStatuses();
 		expect([...statuses.keys()]).toEqual(["0000"]);
 		expect([...statuses.values()]).toEqual(["G"]);
+	});
+
+	test("settings left in status-arrange.json move to statusbar.json", async () => {
+		writeFileSync(join(agentDir, "status-arrange.json"), JSON.stringify({ version: 1, order: ["b", "a"], hidden: ["a"] }));
+		const pi = await load("legacy");
+		const provider = new FakeProvider();
+		provider.m = new Map([
+			["a", "A"],
+			["b", "B"],
+		]);
+		fire(pi, "session_start", fakeCtx(provider));
+		expect([...provider.getExtensionStatuses().values()]).toEqual(["B"]);
+		expect(JSON.parse(readFileSync(configFile(), "utf8"))).toEqual({ version: 1, order: ["b", "a"], hidden: ["a"] });
 	});
 
 	test("a configured separator applies to the arranged items", async () => {
@@ -189,8 +203,8 @@ describe("status-arrange wiring", () => {
 		const ctx = fakeCtx(provider, "rpc");
 		fire(pi, "session_start", ctx);
 		expect(ctx.ui.setFooter).not.toHaveBeenCalled();
-		await pi.commands.get("status-arrange").handler("", ctx);
-		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("status-arrange"), "error");
+		await pi.commands.get("statusbar").handler("", ctx);
+		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("statusbar"), "error");
 		expect(ctx.ui.custom).not.toHaveBeenCalled();
 		expect(pi.exec).not.toHaveBeenCalled();
 	});
@@ -208,7 +222,7 @@ describe("status-arrange wiring", () => {
 	});
 });
 
-describe("status-arrange git status", () => {
+describe("statusbar git status", () => {
 	test("session_start reads the change count and writes the omo-git status", async () => {
 		const pi = await load("git-start");
 		pi.exec = mock(async () => ({ code: 0, stdout: " M a\n?? b\n" }));
@@ -217,7 +231,7 @@ describe("status-arrange git status", () => {
 		fire(pi, "session_start", ctx);
 		await flush();
 		expect(pi.exec).toHaveBeenCalledWith("git", ["status", "--porcelain"], { cwd: "C:/work", timeout: 10000 });
-		expect(ctx.ui.setStatus).toHaveBeenCalledWith("omo-git", "± 2");
+		expect(ctx.ui.setStatus).toHaveBeenCalledWith("omo-git", "±2");
 	});
 
 	test("reading the statuses never runs git", async () => {
@@ -242,14 +256,14 @@ describe("status-arrange git status", () => {
 		fire(pi, "agent_settled", ctx);
 		await flush();
 		expect(pi.exec).toHaveBeenCalledTimes(2);
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("omo-git", "± 2");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("omo-git", "±2");
 	});
 
 	test("a failing git clears the omo-git status", async () => {
 		const pi = await load("git-fail");
 		pi.exec = mock(async () => ({ code: 128, stdout: "" }));
 		const provider = new FakeProvider();
-		provider.m = new Map([["omo-git", "± 2"]]);
+		provider.m = new Map([["omo-git", "±2"]]);
 		const ctx = fakeCtx(provider);
 		fire(pi, "session_start", ctx);
 		await flush();
@@ -265,12 +279,12 @@ describe("status-arrange git status", () => {
 		fire(pi, "session_start", ctx);
 		await flush();
 		fire(pi, "session_shutdown", fakeCtx(provider));
-		provider.m.set("omo-git", "± 2");
-		expect([...provider.getExtensionStatuses().values()]).toContain("± 2");
+		provider.m.set("omo-git", "±2");
+		expect([...provider.getExtensionStatuses().values()]).toContain("±2");
 	});
 });
 
-describe("status-arrange picker wiring", () => {
+describe("statusbar picker wiring", () => {
 	test("the picker gets the saved settings and the last statuses", async () => {
 		writeFileSync(configFile(), JSON.stringify({ version: 1, order: ["goal"], hidden: [], separator: "dot", gitIcon: "nerd" }));
 		const pi = await load("picker-options");
@@ -279,7 +293,7 @@ describe("status-arrange picker wiring", () => {
 		const ctx = fakeCtx(provider);
 		fire(pi, "session_start", ctx);
 		provider.getExtensionStatuses();
-		await pi.commands.get("status-arrange").handler("", ctx);
+		await pi.commands.get("statusbar").handler("", ctx);
 		expect(pickerOptions.separator).toBe("dot");
 		expect(pickerOptions.gitIcon).toBe("nerd");
 		expect([...pickerOptions.statuses().keys()]).toEqual(["goal"]);
@@ -294,12 +308,12 @@ describe("status-arrange picker wiring", () => {
 		const ctx = fakeCtx(provider);
 		fire(pi, "session_start", ctx);
 		await flush();
-		await pi.commands.get("status-arrange").handler("", ctx);
+		await pi.commands.get("statusbar").handler("", ctx);
 		pickerOptions.onPreview({ order: ["goal", "omo-git"], hidden: [], separator: "space", gitIcon: "emoji" });
 		expect([...provider.getExtensionStatuses().values()]).toEqual(["G", "📝 2"]);
-		expect(ctx.ui.setStatus).toHaveBeenCalledWith("omo-git", "± 2");
+		expect(ctx.ui.setStatus).toHaveBeenCalledWith("omo-git", "±2");
 		pickerOptions.onClose();
-		expect([...provider.getExtensionStatuses().values()]).toEqual(["G", "± 2"]);
+		expect([...provider.getExtensionStatuses().values()]).toEqual(["G", "±2"]);
 	});
 
 	test("saving keeps the file minimal and re-renders the git icon", async () => {
@@ -309,7 +323,7 @@ describe("status-arrange picker wiring", () => {
 		const ctx = fakeCtx(provider);
 		fire(pi, "session_start", ctx);
 		await flush();
-		await pi.commands.get("status-arrange").handler("", ctx);
+		await pi.commands.get("statusbar").handler("", ctx);
 		pickerOptions.onSave({ order: ["a", "b"], hidden: ["b"], separator: "space", gitIcon: "plain" });
 		expect(JSON.parse(readFileSync(configFile(), "utf8"))).toEqual({ version: 1, order: ["a", "b"], hidden: ["b"] });
 		pickerOptions.onSave({ order: ["a", "b"], hidden: [], separator: "pipe", gitIcon: "nerd" });

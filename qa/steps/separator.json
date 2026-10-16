@@ -1,7 +1,7 @@
 [
   {"wait":"[Extensions]"},
   {"idle":2500},
-  {"send":"/status-arrange"},
+  {"send":"/statusbar"},
   {"send":"\r"},
   {"wait":"상태줄 정리"},
   {"send":"p"},

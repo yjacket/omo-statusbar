@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
-import { StatusPicker, type PickerOptions, type PickerState } from "../extension/status-arrange/picker.ts";
-import { displayWidth } from "../extension/status-arrange/text.ts";
+import { StatusPicker, type PickerOptions, type PickerState } from "../extension/statusbar/picker.ts";
+import { displayWidth } from "../extension/statusbar/text.ts";
 
 const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
 

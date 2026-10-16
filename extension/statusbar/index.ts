@@ -1,10 +1,11 @@
 import { getAgentDir } from "@code-yeongyu/senpi";
+import { trackCacheStatus } from "./cache.ts";
 import { arrangeStatuses, type Config, emptyConfig, mergeKeys } from "./arrange.ts";
-import { configPath, loadConfig, saveConfig } from "./config.ts";
+import { configPath, loadConfig, readablePath, saveConfig } from "./config.ts";
 import { GIT_STATUS_KEY, gitStatusText, readChangeCount } from "./git.ts";
 import { type PickerState, StatusPicker } from "./picker.ts";
 
-const PATCH = Symbol.for("omo-status-arrange.patch");
+const PATCH = Symbol.for("omo-statusbar.patch");
 const EDITOR_OVERLAY = { width: "96%", maxHeight: "80%", minWidth: 40, margin: 1 } as const;
 
 type Patch = {
@@ -16,7 +17,8 @@ function errorText(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-export function createStatusArrange(pi: any, deps: { agentDir?: () => string } = {}): void {
+export function createStatusbar(pi: any, deps: { agentDir?: () => string } = {}): void {
+	trackCacheStatus(pi);
 	let config: Config = emptyConfig();
 	let configFile: string | undefined;
 	let preview: PickerState | undefined;
@@ -51,7 +53,7 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 		try {
 			saveConfig(configFile, config);
 		} catch (error) {
-			warnOnce(`status-arrange: cannot save ${configFile} (${errorText(error)}); the order applies for this session only`);
+			warnOnce(`statusbar: cannot save ${configFile} (${errorText(error)}); the order applies for this session only`);
 		}
 	}
 
@@ -127,7 +129,7 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 			try {
 				return record.arrange(statuses);
 			} catch (error) {
-				warnOnce(`status-arrange: cannot arrange the footer statuses (${errorText(error)}); showing them unchanged`);
+				warnOnce(`statusbar: cannot arrange the footer statuses (${errorText(error)}); showing them unchanged`);
 				return statuses;
 			}
 		};
@@ -138,10 +140,16 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 		try {
 			if (!ctx.hasUI || ctx.mode !== "tui") return;
 			notify = (message, level) => ctx.ui.notify(message, level);
-			configFile = configPath(deps.agentDir?.() ?? getAgentDir());
-			const loaded = loadConfig(configFile);
+			const agentDir = deps.agentDir?.() ?? getAgentDir();
+			configFile = configPath(agentDir);
+			const source = readablePath(agentDir);
+			const loaded = loadConfig(source);
 			config = loaded.config;
-			if (loaded.error) warnOnce(`status-arrange: cannot read ${configFile} (${loaded.error}); using the default order`);
+			if (source !== configFile && !loaded.error) {
+				dirty = true;
+				flushSave();
+			}
+			if (loaded.error) warnOnce(`statusbar: cannot read ${source} (${loaded.error}); using the default order`);
 
 			let captured: { tui?: any; data?: any } = {};
 			ctx.ui.setFooter((footerTui: any, _theme: unknown, data: any) => {
@@ -151,7 +159,7 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 			ctx.ui.setFooter(undefined);
 
 			if (typeof captured.data?.getExtensionStatuses !== "function") {
-				warnOnce("status-arrange: this omo version does not expose footer statuses; the footer is left as is");
+				warnOnce("statusbar: this omo version does not expose footer statuses; the footer is left as is");
 				void refreshGit(ctx);
 				return;
 			}
@@ -161,7 +169,7 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 			tui?.requestRender?.();
 			void refreshGit(ctx);
 		} catch (error) {
-			warnOnce(`status-arrange: cannot start (${errorText(error)}); the footer is left as is`);
+			warnOnce(`statusbar: cannot start (${errorText(error)}); the footer is left as is`);
 			void refreshGit(ctx);
 		}
 	});
@@ -183,15 +191,15 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 		tui = undefined;
 	});
 
-	pi.registerCommand("status-arrange", {
+	pi.registerCommand("statusbar", {
 		description: "hide and reorder the footer status items in an interactive editor",
 		handler: async (_args: string, ctx: any) => {
 			if (!ctx.hasUI || ctx.mode !== "tui") {
-				ctx.ui?.notify?.("status-arrange: the /status-arrange editor needs the interactive omo TUI", "error");
+				ctx.ui?.notify?.("statusbar: the /statusbar editor needs the interactive omo TUI", "error");
 				return;
 			}
 			if (!provider) {
-				ctx.ui.notify("status-arrange: footer statuses are not available in this omo version", "error");
+				ctx.ui.notify("statusbar: footer statuses are not available in this omo version", "error");
 				return;
 			}
 			await ctx.ui.custom(
@@ -214,7 +222,7 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 							try {
 								saveConfig(configFile as string, next);
 							} catch (error) {
-								return `status-arrange: cannot save (${errorText(error)})`;
+								return `statusbar: cannot save (${errorText(error)})`;
 							}
 							config = next;
 							dirty = false;
@@ -241,5 +249,5 @@ export function createStatusArrange(pi: any, deps: { agentDir?: () => string } =
 }
 
 export default function (pi: any): void {
-	createStatusArrange(pi);
+	createStatusbar(pi);
 }

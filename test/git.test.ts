@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { GIT_STATUS_KEY, countChanges, gitGlyph, gitStatusText, readChangeCount, type Exec } from "../extension/status-arrange/git.ts"
+import { GIT_STATUS_KEY, countChanges, gitGlyph, gitStatusText, readChangeCount, type Exec } from "../extension/statusbar/git.ts"
 
 describe("git status text", () => {
 	test("names the git status key", () => {
@@ -22,7 +22,7 @@ describe("git status text", () => {
 	test("hides nothing-to-show counts", () => {
 		expect(gitStatusText(undefined)).toBeUndefined()
 		expect(gitStatusText(0)).toBeUndefined()
-		expect(gitStatusText(3)).toBe("± 3")
+		expect(gitStatusText(3)).toBe("±3")
 		expect(gitStatusText(3, "emoji")).toBe("📝 3")
 		expect(gitStatusText(1, "nerd")).toBe("\ue702 1")
 	})

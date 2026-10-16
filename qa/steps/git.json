@@ -2,7 +2,7 @@
   {"wait":"[Extensions]"},
   {"idle":3000},
   {"shot":"footer"},
-  {"send":"/status-arrange"},
+  {"send":"/statusbar"},
   {"send":"\r"},
   {"wait":"상태줄 정리"},
   {"send":"g"},

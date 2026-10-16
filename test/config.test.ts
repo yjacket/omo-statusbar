@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CONFIG_FILE, configPath, loadConfig, normalizeConfig, saveConfig } from "../extension/status-arrange/config.ts";
+import { CONFIG_FILE, configPath, loadConfig, normalizeConfig, saveConfig } from "../extension/statusbar/config.ts";
 
 let dir = "";
 
@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 function setup(): string {
-	dir = mkdtempSync(join(tmpdir(), "status-arrange-"));
+	dir = mkdtempSync(join(tmpdir(), "statusbar-"));
 	return join(dir, CONFIG_FILE);
 }
 

@@ -2,17 +2,19 @@ import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSyn
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { displayWidth } from "../extension/status-arrange/text.ts";
+import { displayWidth } from "../extension/statusbar/text.ts";
 
 const root = resolve(import.meta.dirname, "..");
 const qa = join(root, "qa");
 const agentDir = process.env.OMO_CODING_AGENT_DIR || join(homedir(), ".omo", "agent");
-const config = join(agentDir, "status-arrange.json");
+const config = join(agentDir, "statusbar.json");
 const backup = `${config}.qa-backup`;
-const installedExt = join(agentDir, "extensions", "status-arrange");
-const movedExt = join(agentDir, "status-arrange.qa-moved-ext");
+const installedExt = join(agentDir, "git", "github.com", "yjacket", "omo-statusbar");
+const movedExt = join(agentDir, "statusbar.qa-moved-package");
+// With its checkout parked, offline mode keeps omo from cloning the package again at start-up.
+process.env.OMO_OFFLINE = process.env.SENPI_OFFLINE = process.env.PI_OFFLINE = "1";
 const fixture = "qa/fixtures/qa-statuses.ts";
-const dualExt = "extension/status-arrange/index.ts;qa/fixtures/qa-statuses.ts";
+const dualExt = "extension/statusbar/index.ts;qa/fixtures/qa-statuses.ts";
 const scenarios = [
 	"S1-control", "S1-parity",
 	"S2-hide", "S2-persist",
@@ -51,14 +53,14 @@ const run = (command, args, options = {}) => spawnSync(command, args, {
 	...options,
 });
 
-const shared = mkdtempSync(join(tmpdir(), "status-arrange-qa-"));
+const shared = mkdtempSync(join(tmpdir(), "statusbar-qa-"));
 let hadConfig = false;
 let movedExtBack = false;
 let gitDir;
 let failures = 0;
 try {
-	// An installed copy would load into every scenario, including S1-control, so it is parked outside
-	// extensions/ for the whole run; only the --ext copies below load.
+	// The installed package would load into every scenario, including S1-control, so its checkout is
+	// parked for the whole run; only the --ext copies below load.
 	if (existsSync(movedExt)) throw new Error(`qa-moved-ext already exists: ${movedExt}`);
 	if (existsSync(installedExt)) {
 		renameSync(installedExt, movedExt);
@@ -150,7 +152,7 @@ try {
 	await scenario("S7-corrupt", () => {
 		writeFileSync(config, "{not json");
 		execute("S7-corrupt", "baseline", dualExt);
-		assert(readText("S7-corrupt", "footer").includes("status-arrange.json"), "corrupt-config warning is missing");
+		assert(readText("S7-corrupt", "footer").includes("statusbar.json"), "corrupt-config warning is missing");
 		assert(line2("S7-corrupt") === line2("S1-control"), "corrupt config did not use default status order");
 		rmSync(config, { force: true });
 	});
@@ -163,10 +165,10 @@ try {
 	await scenario("S9-print", () => {
 		const result = run("bun", [
 			"C:/Users/yjack/.bun/install/global/node_modules/omo-ai/bin/omo.js", "--no-session",
-			"-e", "extension/status-arrange/index.ts", "-p", "Reply with exactly: ok",
+			"-e", "extension/statusbar/index.ts", "-p", "Reply with exactly: ok",
 		], { timeout: 120000 });
 		assert(result.status === 0, `print command exited ${result.status}`);
-		assert(!/status-arrange[\s\S]*?(?:Error|at )/.test(result.stderr), "status-arrange stack trace in stderr");
+		assert(!/statusbar[\s\S]*?(?:Error|at )/.test(result.stderr), "statusbar stack trace in stderr");
 	});
 	// Installed extensions (og-promo, omo-health) may publish between the fixture items, so each QA item
 	// is checked for its own "| " prefix instead of requiring the two to be adjacent.
@@ -182,7 +184,7 @@ try {
 		assert(piped(line2("S10-persist")), "separator did not persist");
 	});
 	await scenario("S11-git", () => {
-		gitDir = mkdtempSync(join(tmpdir(), "status-arrange-git-"));
+		gitDir = mkdtempSync(join(tmpdir(), "statusbar-git-"));
 		const init = run("git", ["init", "-q"], { cwd: gitDir });
 		assert(init.status === 0, `git init exited ${init.status}`);
 		writeFileSync(join(gitDir, "a.txt"), "a\n");
@@ -190,7 +192,7 @@ try {
 		const status = run("git", ["status", "--porcelain"], { cwd: gitDir });
 		assert(status.stdout.trim().split(/\r?\n/).length === 2, `git status --porcelain is not 2 lines: ${status.stdout}`);
 		execute("S11-git", "git", dualExt, [], gitDir);
-		assert(line2("S11-git").includes("± 2"), "footer does not show the dirty count");
+		assert(line2("S11-git").includes("±2"), "footer does not show the dirty count");
 		assert(line2("S11-git", "preview").includes("📝 2"), "preview does not use the emoji git icon");
 		assert(line2("S11-git", "closed").includes("📝 2"), "closed footer does not use the emoji git icon");
 		assert(JSON.parse(readFileSync(config, "utf8")).gitIcon === "emoji", "config does not save gitIcon emoji");

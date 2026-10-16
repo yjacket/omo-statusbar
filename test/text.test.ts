@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { displayWidth, fitCells, padCells, plainText } from "../extension/status-arrange/text.ts"
+import { displayWidth, fitCells, padCells, plainText } from "../extension/statusbar/text.ts"
 
 describe("terminal text helpers", () => {
 	test("counts terminal cells", () => {

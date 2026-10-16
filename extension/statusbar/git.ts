@@ -19,10 +19,10 @@ export function countChanges(porcelain: string): number {
 	return count
 }
 
-/** `± 3`-style status text, or undefined when there is nothing to show. */
+/** `±3`-style status text (emoji and Nerd glyphs keep a space), or undefined when there is nothing to show. */
 export function gitStatusText(count: number | undefined, icon: GitIcon = "plain"): string | undefined {
 	if (count === undefined || count === 0) return undefined
-	return `${gitGlyph(icon)} ${count}`
+	return icon === "plain" ? `${gitGlyph(icon)}${count}` : `${gitGlyph(icon)} ${count}`
 }
 
 export type Exec = (

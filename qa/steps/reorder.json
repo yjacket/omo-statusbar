@@ -6,7 +6,7 @@
     "idle": 2500
   },
   {
-    "send": "/status-arrange"
+    "send": "/statusbar"
   },
   {
     "send": "\r"

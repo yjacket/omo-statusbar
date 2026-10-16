@@ -1,7 +1,13 @@
 {
-	"name": "omo-status-arrange",
+	"name": "omo-statusbar",
 	"private": true,
 	"type": "module",
+	"description": "OMO/Senpi extension: hide and reorder the footer status items, plus git and prompt-cache statuses.",
+	"pi": {
+		"extensions": [
+			"extension/statusbar/index.ts"
+		]
+	},
 	"scripts": {
 		"test": "bun test"
 	},

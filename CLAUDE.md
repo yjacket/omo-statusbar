@@ -4,7 +4,7 @@ This file guides Claude Code (claude.ai/code) in this repository.
 
 ## What this is
 
-`extension/status-arrange/` is an OMO/Senpi extension, installed as `<agentDir>/extensions/status-arrange/`. It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/status-arrange` opens an editor, and settings live in `<agentDir>/status-arrange.json` (`{ version: 1, order: string[], hidden: string[], separator?, gitIcon? }`). It also publishes its own `omo-git` status (uncommitted file count). README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
+`extension/statusbar/` is an OMO/Senpi extension, installed as an omo package (`omo install git:github.com/yjacket/omo-statusbar`; `package.json` `pi.extensions` names the entry). It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/statusbar` opens an editor, and settings live in `<agentDir>/statusbar.json` (`{ version: 1, order: string[], hidden: string[], separator?, gitIcon? }`). It also publishes its own `omo-git` status (uncommitted file count) and `omo-cache` (prompt cache time left / since expiry, taken over from omo-tps-plus). A `status-arrange.json` from before the rename is read once and saved as `statusbar.json`. README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
 
 ## Commands
 
@@ -12,10 +12,10 @@ This file guides Claude Code (claude.ai/code) in this repository.
 bun test
 bun qa/run-qa.mjs
 bun qa/run-qa.mjs --only S2-hide
-sh install.sh   |   .\install.ps1
+omo install <path-to-this-clone>   # loads the working tree; /reload picks up edits
 ```
 
-`run-qa` moves an installed copy out of `extensions/` for the run and puts it back afterwards.
+`run-qa` parks the installed package checkout (`<agentDir>/git/github.com/yjacket/omo-statusbar`) for the run with `OMO_OFFLINE=1` so omo does not clone it again, and puts it back afterwards.
 
 ## Senpi facts this relies on
 
@@ -33,11 +33,12 @@ sh install.sh   |   .\install.ps1
 - No IO in render. Settings are read on load and written on save.
 - Status keys are kept byte-exact, leading spaces included.
 - git runs only on `session_start` and `agent_settled`, never in render. Its status key is `omo-git`.
+- `omo-cache` (cache.ts) runs on one unref'd `setTimeout` chain that recomputes from `Date.now()` and re-arms at the next text change. A throwing `setStatus` (stale ctx) ends the chain. TTL comes from `@earendil-works/pi-ai` `resolvePromptCacheTtlSeconds`.
 
 ## Testing
 
-Tests mock senpi modules with `mock.module` and import a fresh copy with a `?case=` query. Use `jest.useFakeTimers()` from `bun:test` for timers. No sleeps.
+Tests mock senpi modules with `mock.module` and import a fresh copy with a `?case=` query. Every `@earendil-works/pi-ai` mock declares `resolvePromptCacheTtlSeconds`. Use `jest.useFakeTimers()` and `setSystemTime` from `bun:test` for timers and clocks. No sleeps.
 
 ## Commits
 
-`status-arrange: <what changed>`
+`statusbar: <what changed>`

@@ -122,7 +122,7 @@ window.__ready = true;
 
 async function ensureBrowser() {
   if (browserWs) return;
-  profile = mkdtempSync(join(tmpdir(), "omo-status-arrange-qa-chrome-"));
+  profile = mkdtempSync(join(tmpdir(), "omo-statusbar-qa-chrome-"));
   server = Bun.serve({ port: 0, fetch: () => new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8" } }) });
   chrome = Bun.spawn([CHROME, "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`,
     "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--window-size=2400,1600", "about:blank"],

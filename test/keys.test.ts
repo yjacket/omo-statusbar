@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { decodeKey } from "../extension/status-arrange/keys.ts"
+import { decodeKey } from "../extension/statusbar/keys.ts"
 
 describe("decodeKey", () => {
 	test("maps legacy navigation and edit keys", () => {

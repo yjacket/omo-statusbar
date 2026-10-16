@@ -1,4 +1,4 @@
-# omo-status-arrange
+# omo-statusbar
 
 [한국어](README.ko.md)
 
@@ -6,23 +6,22 @@ The second line of omo's footer lists status items from your extensions, sorted 
 
 ## Install
 
-Windows (PowerShell):
-
-```powershell
-irm https://raw.githubusercontent.com/yjacket/omo-status-arrange/master/install.ps1 | iex
-```
-
-Linux, macOS:
-
 ```sh
-curl -fsSL https://raw.githubusercontent.com/yjacket/omo-status-arrange/master/install.sh | sh
+omo install git:github.com/yjacket/omo-statusbar
 ```
 
-The script downloads the latest `master` and copies `extension/status-arrange` into `~/.omo/agent/extensions/status-arrange`, or into the folder named by `OMO_CODING_AGENT_DIR`. Then type `/reload` in any running session. From a clone, run `.\install.ps1` or `sh install.sh` to install that checkout without downloading.
+omo clones the repository into `<agentDir>/git/github.com/yjacket/omo-statusbar` and adds it to `packages` in `<agentDir>/settings.json`. Type `/reload` in running sessions.
+
+To update, run `omo update --extensions` (every installed package) or `omo update git:github.com/yjacket/omo-statusbar`, then `/reload`.
+
+Coming from the old copy scripts:
+
+- Delete `<agentDir>/extensions/status-arrange`, or it loads next to the package. Settings in `status-arrange.json` move to `statusbar.json` on the first start.
+- Delete `<agentDir>/extensions/tps.js` if omo-tps-plus is installed. Its footer status lives here now as `omo-cache`; omo writes its stock tps file back on the next start.
 
 ## Usage
 
-Type `/status-arrange` to open the list of status items.
+Type `/statusbar` to open the list of status items.
 
 | Key | Action |
 | --- | --- |
@@ -42,9 +41,21 @@ Type `/status-arrange` to open the list of status items.
 
 Senpi sorts footer statuses by key. The extension wraps the footer's status source and renames the keys so they sort in the order you chose. An item it hasn't seen before shows up right after its alphabetical neighbor.
 
-The extension also publishes its own status, `omo-git`, shown as `± N`. N counts uncommitted files (modified, staged, untracked) from `git status --porcelain`. It refreshes at session start and after every reply, and it's hidden when the tree is clean or the folder isn't a repo. Like any status, you can move or hide it in the editor. The separator between items is applied by this extension, not by omo.
+The extension also publishes its own status, `omo-git`, shown as `±N`. N counts uncommitted files (modified, staged, untracked) from `git status --porcelain`. It refreshes at session start and after every reply, and it's hidden when the tree is clean or the folder isn't a repo. Like any status, you can move or hide it in the editor.
 
-Settings live in `<agentDir>/status-arrange.json`:
+It also publishes `omo-cache`, the prompt cache lifetime counted from the last reply:
+
+```
+🔥 52m    the cache is warm; minutes left, rounded up
+🧊 12m    the cache expired 12 minutes ago (hours after the first hour: 🧊 2h)
+🧊        no reply yet, a model switch, or expired under a minute ago
+```
+
+The lifetime is senpi's per-model TTL (`resolvePromptCacheTtlSeconds`): 1 hour on a Claude subscription, 5 minutes on Anthropic API keys. It restarts with every reply. At session start, reload or switch it picks up from the last reply in the conversation. It's hidden when senpi knows no TTL for the model. This replaces the footer status of omo-tps-plus; if that is still installed, hide its `cache-ttl` item or uninstall it.
+
+The separator between items is applied by this extension, not by omo.
+
+Settings live in `<agentDir>/statusbar.json`:
 
 ```json
 {
@@ -62,7 +73,12 @@ Keys are stored exactly as the extensions set them, leading spaces included. If 
 
 - If another extension installs its own footer with `setFooter`, the capture at start-up can reset it.
 - It only works in the interactive TUI.
+- `omo-cache` only follows the clock. It cannot see a keep-alive ping that refreshed the cache while the session was idle, or a Claude subscription dropping to a 5-minute TTL past its usage limits.
 
 ## Uninstall
 
-Delete `<agentDir>/extensions/status-arrange`. You can also delete `<agentDir>/status-arrange.json`. Then type `/reload`.
+```sh
+omo remove git:github.com/yjacket/omo-statusbar
+```
+
+You can also delete `<agentDir>/statusbar.json`. Then type `/reload`.

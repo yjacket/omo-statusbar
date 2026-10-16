@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export type Separator = "space" | "pipe" | "dot" | "slash" | "brackets";
@@ -15,10 +15,20 @@ export type Config = {
 const SEPARATORS: readonly Separator[] = ["space", "pipe", "dot", "slash", "brackets"];
 const GIT_ICONS: readonly GitIcon[] = ["plain", "emoji", "nerd"];
 
-export const CONFIG_FILE = "status-arrange.json";
+export const CONFIG_FILE = "statusbar.json";
+
+export const LEGACY_CONFIG_FILE = "status-arrange.json";
 
 export function configPath(agentDir: string): string {
 	return join(agentDir, CONFIG_FILE);
+}
+
+/** The file to read settings from: statusbar.json, or the status-arrange.json an install from
+ * before the rename left behind while statusbar.json does not exist yet. Saves always go to statusbar.json. */
+export function readablePath(agentDir: string): string {
+	const path = configPath(agentDir);
+	const legacy = join(agentDir, LEGACY_CONFIG_FILE);
+	return !existsSync(path) && existsSync(legacy) ? legacy : path;
 }
 
 function emptyConfig(): Config {
