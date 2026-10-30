@@ -6,6 +6,7 @@ export type Config = {
 	hidden: string[];
 	separator?: Separator;
 	gitIcon?: GitIcon;
+	runTime?: false;
 };
 
 export const SEPARATORS: readonly Separator[] = ["space", "pipe", "dot", "slash", "brackets"];
