@@ -53,6 +53,15 @@ senpi는 푸터 상태를 키 순서로 정렬합니다. 이 확장은 푸터의
 
 수명은 senpi의 모델별 TTL(`resolvePromptCacheTtlSeconds`)입니다. Claude 구독은 1시간, Anthropic API 키는 5분입니다. 답이 올 때마다 다시 시작합니다. 세션 시작, 리로드, 전환 때는 대화의 마지막 답부터 이어서 셉니다. senpi가 모델의 TTL을 모르면 숨겨집니다.
 
+실행이 끝날 때마다 omo의 TPS 줄 바로 아래에 시간 줄이 나옵니다. 실행이 끝난 현지 시각과, 프롬프트부터 실행 끝까지 실제로 걸린 시간입니다(TPS 줄이 세는 스트리밍 시간만이 아닙니다):
+
+```
+TPS 61.2 tok/s. Cache hit 98.1%, 41.3s
+⏱ 14:05:12 (3m 12s)
+```
+
+걸린 시간은 `12s`, `3m 12s`, `1h 05m`처럼 씁니다. 이 줄은 화면에만 나옵니다. 세션 파일에 저장되지 않고 모델도 보지 않습니다. omo는 알림 바로 아래에 온 알림으로 앞 알림을 바꿔 버리므로, 이 확장은 senpi의 tps 확장을 따로 한 벌 돌려(실행 중인 omo에서 불러오고 복사하지 않습니다) 그 TPS 문구를 다시 쓰고 아래에 시간 줄을 붙입니다. 그 모듈을 불러오지 못하면 시간 줄은 꺼지고 omo의 TPS 줄은 그대로 둡니다. 이때 경고가 한 번 나옵니다.
+
 항목 사이 구분자는 omo가 아니라 이 확장이 넣습니다.
 
 설정은 `<agentDir>/statusbar.json`에 저장됩니다:
@@ -63,21 +72,23 @@ senpi는 푸터 상태를 키 순서로 정렬합니다. 이 확장은 푸터의
 	"order": ["omo-cache", "  omo-native", "goal"],
 	"hidden": ["omo-git"],
 	"separator": "pipe",
-	"gitIcon": "plain"
+	"gitIcon": "plain",
+	"runTime": false
 }
 ```
 
-키는 앞 공백까지 확장이 정한 그대로 저장됩니다. 이 파일은 omo 런타임 밖에 있어서 omo나 omo-ai를 업데이트해도 남아 있습니다. `separator`나 `gitIcon`이 없으면 공백과 `±`를 씁니다.
+키는 앞 공백까지 확장이 정한 그대로 저장됩니다. 이 파일은 omo 런타임 밖에 있어서 omo나 omo-ai를 업데이트해도 남아 있습니다. `separator`나 `gitIcon`이 없으면 공백과 `±`를 씁니다. `"runTime": false`면 시간 줄을 끕니다. 없으면 켜져 있습니다.
 
 ## 제한
 
 - 다른 확장이 `setFooter`로 자기 푸터를 설치하면, 시작할 때의 캡처 과정에서 그 푸터가 초기화될 수 있습니다.
 - 대화형 TUI에서만 동작합니다.
+- 시간 줄은 이 세션에서 시작한 실행에만 나옵니다. `/reload`할 때 이미 돌고 있던 실행에는 나오지 않습니다. TPS 줄과 실행 끝 사이에 다른 알림이 끼면 TPS 문구가 그 아래에 한 번 더 나옵니다.
 - `omo-cache`는 시계만 봅니다. 세션이 쉬는 동안 keep-alive 요청으로 캐시가 갱신된 것이나, Claude 구독이 사용 한도를 넘어 5분 TTL로 떨어진 것은 알 수 없습니다.
 
 ## 개발
 
-git worktree에서 새 브랜치로 작업하고 PR을 여세요. `master`에는 `test` 검사(`.github/workflows/test.yml`, windows-latest, `bun run test`)를 통과한 PR로만 변경이 들어갑니다.
+git worktree에서 새 브랜치로 작업하고 PR을 여세요. `master`에는 `test` 검사(`.github/workflows/test.yml`, windows-latest, `bun run test`)를 통과한 PR로만 변경이 들어갑니다. CI는 먼저 omo-ai를 설치합니다. `test/tps-compat.test.ts`가 설치된 senpi의 tps 확장을 불러오고, 그 경로나 알림 문구가 바뀌면 실패하기 때문입니다.
 
 로컬 테스트는 Bun 1.4 이상에서 실행합니다:
 

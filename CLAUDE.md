@@ -4,7 +4,7 @@ This file guides Claude Code (claude.ai/code) in this repository.
 
 ## What this is
 
-`extension/statusbar/` is an OMO/Senpi extension, installed as an omo package (`omo install git:github.com/yjacket/omo-statusbar`; `package.json` `pi.extensions` names the entry). It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/statusbar` opens an editor, and settings live in `<agentDir>/statusbar.json` (`{ version: 1, order: string[], hidden: string[], separator?, gitIcon? }`). It also publishes its own `omo-git` status (uncommitted file count) and `omo-cache` (prompt cache time left / since expiry; replaces the deprecated omo-tps-plus). A `status-arrange.json` from before the rename is read once and saved as `statusbar.json`. README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
+`extension/statusbar/` is an OMO/Senpi extension, installed as an omo package (`omo install git:github.com/yjacket/omo-statusbar`; `package.json` `pi.extensions` names the entry). It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/statusbar` opens an editor, and settings live in `<agentDir>/statusbar.json` (`{ version: 1, order: string[], hidden: string[], separator?, gitIcon?, runTime?: false }`). It also publishes its own `omo-git` status (uncommitted file count) and `omo-cache` (prompt cache time left / since expiry; replaces the deprecated omo-tps-plus). A `status-arrange.json` from before the rename is read once and saved as `statusbar.json`. README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
 
 ## Commands
 
@@ -23,6 +23,8 @@ Work in a worktree on a branch and land changes through a PR; the `test` check (
 - `getExtensionStatuses()` returns the live `Map`, not a copy.
 - The footer sorts statuses by key with `localeCompare`. Renamed keys decide the order.
 - On reload senpi resets the footer, so the wrapper must be put back on the new provider.
+- `ui.notify(text, "info")` (`showStatus`) overwrites the status line right above it, so a second notice replaces the builtin TPS line. runtime.ts runs a private instance of senpi's builtin `tps.js` (resolved like resource-loader: `<packageDir>/core/...` or `<packageDir>/dist/core/extensions/builtin/tps.js`) and sends one `TPS ...\n⏱ ...` notice.
+- `agent-session` awaits every extension's `agent_end` handler before it emits `agent_settled`, so the notice sent on `agent_settled` always lands after the builtin's.
 
 ## Invariants
 

@@ -1,7 +1,8 @@
 // Real-TUI QA harness: runs omo in a PTY with the installed extensions (plus --ext), drives it with steps, snapshots via xterm.js in headless Chrome.
 // steps: {"wait": text} (anywhere in output), {"waitNew": text} (after the last send), {"idle": ms} (no output for ms),
 //        {"send": keys}, {"shot": name}, {"mark": label}, {"rm": path} (delete a fixture path mid-session)
-// usage: bun qa/tui-qa.mjs --cwd <dir> --cols N --rows N --steps <json> --out <dir> [--editor <cmd>] [--timeout <s>=120] [--agent-dir <dir>] [--ext <file>[;<file>...]]
+// usage: bun qa/tui-qa.mjs --cwd <dir> --cols N --rows N --steps <json> --out <dir> [--editor <cmd>] [--timeout <s>=120] [--agent-dir <dir>]
+//        [--session-dir <dir>] (keep the session file there instead of --no-session) [--model <provider/id>] [--ext <file>[;<file>...]]
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -166,7 +167,8 @@ async function main() {
 
   // --no-extensions drops discovered and package extensions (an installed omo-statusbar among them)
   // but keeps omo's builtins, so only the --ext files under test add to the footer.
-  const cmd = ["bun", OMO_JS, "--no-session", "--no-extensions"];
+  const cmd = ["bun", OMO_JS, ...(args["session-dir"] ? ["--session-dir", resolve(args["session-dir"])] : ["--no-session"]), "--no-extensions"];
+  if (args.model) cmd.push("--model", args.model);
   if (args.ext) for (const ext of args.ext.split(";").filter(Boolean)) cmd.push("-e", resolve(ext)); // load extension files under test without installing them
   const env = { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" };
   if (args.editor) env.VISUAL = args.editor;

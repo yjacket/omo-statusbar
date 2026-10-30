@@ -11,4 +11,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      # test/tps-compat.test.ts runs the installed senpi's builtin tps extension, found in the bun global
+      # layout ~/.bun/install/global/node_modules/@code-yeongyu/senpi that `bun add -g omo-ai` creates.
+      - name: install omo engine (omo-ai)
+        run: bun add -g omo-ai
       - run: bun run test

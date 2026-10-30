@@ -53,6 +53,15 @@ It also publishes `omo-cache`, the prompt cache lifetime counted from the last r
 
 The lifetime is senpi's per-model TTL (`resolvePromptCacheTtlSeconds`): 1 hour on a Claude subscription, 5 minutes on Anthropic API keys. It restarts with every reply. At session start, reload or switch it picks up from the last reply in the conversation. It's hidden when senpi knows no TTL for the model.
 
+After each run, a time line appears right under omo's TPS line: the local time the run ended and how long it took on the wall clock, from your prompt to the end of the run (not just the streaming time the TPS line counts):
+
+```
+TPS 61.2 tok/s. Cache hit 98.1%, 41.3s
+⏱ 14:05:12 (3m 12s)
+```
+
+Durations read `12s`, `3m 12s`, `1h 05m`. The line is on screen only: it isn't saved in the session file and the model never sees it. omo replaces a notice that sits right under another one, so the extension runs its own copy of senpi's tps extension (loaded from the running omo, never copied) and shows its TPS text again with the time line below. If that module can't be loaded, the time line is off and omo's own TPS line is left alone; a warning says so once.
+
 The separator between items is applied by this extension, not by omo.
 
 Settings live in `<agentDir>/statusbar.json`:
@@ -63,21 +72,23 @@ Settings live in `<agentDir>/statusbar.json`:
 	"order": ["omo-cache", "  omo-native", "goal"],
 	"hidden": ["omo-git"],
 	"separator": "pipe",
-	"gitIcon": "plain"
+	"gitIcon": "plain",
+	"runTime": false
 }
 ```
 
-Keys are stored exactly as the extensions set them, leading spaces included. If `separator` or `gitIcon` is missing, you get a space and `±`. The file sits outside the omo runtime, so it survives omo and omo-ai updates.
+Keys are stored exactly as the extensions set them, leading spaces included. If `separator` or `gitIcon` is missing, you get a space and `±`. `"runTime": false` turns the time line off; without it the line is on. The file sits outside the omo runtime, so it survives omo and omo-ai updates.
 
 ## Limits
 
 - If another extension installs its own footer with `setFooter`, the capture at start-up can reset it.
 - It only works in the interactive TUI.
+- The time line needs a run that started in this session: a run that was already going when you typed `/reload` gets none. If another notice appears between the TPS line and the end of the run, the TPS text shows up a second time under it.
 - `omo-cache` only follows the clock. It cannot see a keep-alive ping that refreshed the cache while the session was idle, or a Claude subscription dropping to a 5-minute TTL past its usage limits.
 
 ## Development
 
-Work in a git worktree on a new branch and open a pull request. `master` only accepts changes through a PR whose `test` check passes (`.github/workflows/test.yml`, windows-latest, `bun run test`).
+Work in a git worktree on a new branch and open a pull request. `master` only accepts changes through a PR whose `test` check passes (`.github/workflows/test.yml`, windows-latest, `bun run test`). CI installs omo-ai first, because `test/tps-compat.test.ts` loads the installed senpi's tps extension and fails when its path or notice text changes.
 
 Run the tests locally with Bun 1.4 or later:
 
