@@ -4,7 +4,7 @@ This file guides Claude Code (claude.ai/code) in this repository.
 
 ## What this is
 
-`extension/statusbar/` is an OMO/Senpi extension, installed as an omo package (`omo install git:github.com/yjacket/omo-statusbar`; `package.json` `pi.extensions` names the entry). It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/statusbar` opens an editor, and settings live in `<agentDir>/statusbar.json` (`{ version: 1, order: string[], hidden: string[], separator?, gitIcon? }`). It also publishes its own `omo-git` status (uncommitted file count) and `omo-cache` (prompt cache time left / since expiry, taken over from omo-tps-plus). A `status-arrange.json` from before the rename is read once and saved as `statusbar.json`. README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
+`extension/statusbar/` is an OMO/Senpi extension, installed as an omo package (`omo install git:github.com/yjacket/omo-statusbar`; `package.json` `pi.extensions` names the entry). It reorders and hides the status items on the second line of omo's footer and keeps omo's footer itself. `/statusbar` opens an editor, and settings live in `<agentDir>/statusbar.json` (`{ version: 1, order: string[], hidden: string[], separator?, gitIcon? }`). It also publishes its own `omo-git` status (uncommitted file count) and `omo-cache` (prompt cache time left / since expiry; replaces the deprecated omo-tps-plus). A `status-arrange.json` from before the rename is read once and saved as `statusbar.json`. README.md is the user-facing spec. README.ko.md mirrors it with the same headings in the same order.
 
 ## Commands
 
@@ -12,10 +12,10 @@ This file guides Claude Code (claude.ai/code) in this repository.
 bun test
 bun qa/run-qa.mjs
 bun qa/run-qa.mjs --only S2-hide
-omo install <path-to-this-clone>   # loads the working tree; /reload picks up edits
+omo install <path-to-this-clone>   # dev check only; reinstall git:github.com/yjacket/omo-statusbar afterwards
 ```
 
-`run-qa` parks the installed package checkout (`<agentDir>/git/github.com/yjacket/omo-statusbar`) for the run with `OMO_OFFLINE=1` so omo does not clone it again, and puts it back afterwards.
+Work in a worktree on a branch and land changes through a PR; the `test` check (`bun run test` on windows-latest) is required on `master`. Run `run-qa` with `OMO_CODING_AGENT_DIR`, `HOME` and `USERPROFILE` pointing at a temp folder, never the real `~/.omo`. Without `OMO_CODING_AGENT_DIR` it uses `~/.omo/agent`. `run-qa` parks the installed package checkout (`<agentDir>/git/github.com/yjacket/omo-statusbar`) for the run with `OMO_OFFLINE=1` so omo does not clone it again, and puts it back afterwards.
 
 ## Senpi facts this relies on
 
