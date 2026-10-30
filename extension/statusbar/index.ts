@@ -1,9 +1,10 @@
-import { getAgentDir } from "@code-yeongyu/senpi";
+import { getAgentDir, getPackageDir } from "@code-yeongyu/senpi";
 import { trackCacheStatus } from "./cache.ts";
 import { arrangeStatuses, type Config, emptyConfig, mergeKeys } from "./arrange.ts";
 import { configPath, loadConfig, readablePath, saveConfig } from "./config.ts";
 import { GIT_STATUS_KEY, gitStatusText, readChangeCount } from "./git.ts";
 import { type PickerState, StatusPicker } from "./picker.ts";
+import { loadBuiltinTps, type TpsFactory, trackRunTime } from "./runtime.ts";
 
 const PATCH = Symbol.for("omo-statusbar.patch");
 const EDITOR_OVERLAY = { width: "96%", maxHeight: "80%", minWidth: 40, margin: 1 } as const;
@@ -17,7 +18,10 @@ function errorText(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-export function createStatusbar(pi: any, deps: { agentDir?: () => string } = {}): void {
+export function createStatusbar(
+	pi: any,
+	deps: { agentDir?: () => string; loadTps?: () => Promise<TpsFactory>; now?: () => number } = {},
+): Promise<void> {
 	trackCacheStatus(pi);
 	let config: Config = emptyConfig();
 	let configFile: string | undefined;
@@ -30,6 +34,7 @@ export function createStatusbar(pi: any, deps: { agentDir?: () => string } = {})
 	let gitRerun = false;
 	let notify: ((message: string, level: "warning" | "error") => void) | undefined;
 	const warned = new Set<string>();
+	let runTimeError: string | undefined;
 	let dirty = false;
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -140,6 +145,7 @@ export function createStatusbar(pi: any, deps: { agentDir?: () => string } = {})
 		try {
 			if (!ctx.hasUI || ctx.mode !== "tui") return;
 			notify = (message, level) => ctx.ui.notify(message, level);
+			if (runTimeError) warnOnce(runTimeError);
 			const agentDir = deps.agentDir?.() ?? getAgentDir();
 			configFile = configPath(agentDir);
 			const source = readablePath(agentDir);
@@ -219,6 +225,7 @@ export function createStatusbar(pi: any, deps: { agentDir?: () => string } = {})
 							const next: Config = { version: 1, order: [...state.order], hidden: [...state.hidden] };
 							if (state.separator !== "space") next.separator = state.separator;
 							if (state.gitIcon !== "plain") next.gitIcon = state.gitIcon;
+							if (config.runTime === false) next.runTime = false;
 							try {
 								saveConfig(configFile as string, next);
 							} catch (error) {
@@ -246,8 +253,18 @@ export function createStatusbar(pi: any, deps: { agentDir?: () => string } = {})
 			);
 		},
 	});
+
+	return trackRunTime(pi, {
+		enabled: () => config.runTime !== false,
+		loadTps: deps.loadTps ?? (() => loadBuiltinTps(getPackageDir())),
+		now: deps.now,
+		onError: (message) => {
+			runTimeError = message;
+			if (notify) warnOnce(message);
+		},
+	});
 }
 
 export default function (pi: any): void {
-	createStatusbar(pi);
+	void createStatusbar(pi);
 }

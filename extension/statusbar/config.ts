@@ -10,6 +10,7 @@ export type Config = {
 	hidden: string[];
 	separator?: Separator;
 	gitIcon?: GitIcon;
+	runTime?: false;
 };
 
 const SEPARATORS: readonly Separator[] = ["space", "pipe", "dot", "slash", "brackets"];
@@ -57,6 +58,7 @@ export function normalizeConfig(raw: unknown): Config | undefined {
 	};
 	if ((SEPARATORS as readonly unknown[]).includes(value.separator)) config.separator = value.separator as Separator;
 	if ((GIT_ICONS as readonly unknown[]).includes(value.gitIcon)) config.gitIcon = value.gitIcon as GitIcon;
+	if (value.runTime === false) config.runTime = false;
 	return config;
 }
 

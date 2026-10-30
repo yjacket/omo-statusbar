@@ -9,7 +9,7 @@ import * as realPicker from "../extension/statusbar/picker.ts";
 const PATCH = Symbol.for("omo-statusbar.patch");
 let agentDir = "";
 
-mock.module("@code-yeongyu/senpi", () => ({ getAgentDir: () => agentDir }));
+mock.module("@code-yeongyu/senpi", () => ({ getAgentDir: () => agentDir, getPackageDir: () => agentDir }));
 mock.module("@earendil-works/pi-ai", () => ({ resolvePromptCacheTtlSeconds: () => undefined }));
 
 // The picker itself is another file's subject; here it only records the options it was built with.
@@ -72,10 +72,15 @@ function fakeCtx(provider: FakeProvider, mode = "tui") {
 	};
 }
 
-async function load(name: string) {
+// stands in for senpi's builtin tps extension: one notice per run
+const fakeTps = async () => (tps: any) => {
+	tps.on("agent_end", (_event: unknown, ctx: any) => ctx.ui.notify("TPS 50.0 tok/s. Cache hit 0.0%, 2.0s", "info"));
+};
+
+async function load(name: string, clock: () => number = () => 0) {
 	const mod = await import(`../extension/statusbar/index.ts?case=${name}`);
 	const pi = fakePi();
-	mod.createStatusbar(pi);
+	await mod.createStatusbar(pi, { loadTps: fakeTps, now: clock });
 	return pi;
 }
 
@@ -335,5 +340,53 @@ describe("statusbar picker wiring", () => {
 			gitIcon: "nerd",
 		});
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("omo-git", "\ue702 3");
+	});
+
+	test("saving from the editor keeps runTime off", async () => {
+		writeFileSync(configFile(), JSON.stringify({ version: 1, order: [], hidden: [], runTime: false }));
+		const pi = await load("picker-runtime");
+		const ctx = fakeCtx(new FakeProvider());
+		fire(pi, "session_start", ctx);
+		await pi.commands.get("statusbar").handler("", ctx);
+		pickerOptions.onSave({ order: ["a"], hidden: [], separator: "space", gitIcon: "plain" });
+		expect(JSON.parse(readFileSync(configFile(), "utf8"))).toEqual({ version: 1, order: ["a"], hidden: [], runTime: false });
+	});
+});
+
+describe("run time line", () => {
+	const run = async (pi: ReturnType<typeof fakePi>, ctx: unknown) => {
+		fire(pi, "agent_start", ctx);
+		for (const handler of pi.handlers.get("agent_end") ?? []) handler({ messages: [] }, ctx);
+		fire(pi, "agent_settled", ctx);
+	};
+
+	test("shows the TPS text with the run's end time and length below it", async () => {
+		const times = [new Date(2026, 9, 31, 14, 2, 0).getTime(), new Date(2026, 9, 31, 14, 5, 12).getTime()];
+		const pi = await load("runtime-on", () => times.shift() as number);
+		const ctx = fakeCtx(new FakeProvider());
+		fire(pi, "session_start", ctx);
+		await run(pi, ctx);
+		expect(ctx.ui.notify).toHaveBeenCalledTimes(1);
+		expect(ctx.ui.notify).toHaveBeenCalledWith("TPS 50.0 tok/s. Cache hit 0.0%, 2.0s\n⏱ 14:05:12 (3m 12s)", "info");
+	});
+
+	test("runTime false in statusbar.json turns it off", async () => {
+		writeFileSync(configFile(), JSON.stringify({ version: 1, order: [], hidden: [], runTime: false }));
+		const pi = await load("runtime-off");
+		const ctx = fakeCtx(new FakeProvider());
+		fire(pi, "session_start", ctx);
+		await run(pi, ctx);
+		expect(ctx.ui.notify).not.toHaveBeenCalled();
+	});
+
+	test("a builtin that cannot load warns once at session start and shows nothing", async () => {
+		const mod = await import("../extension/statusbar/index.ts?case=runtime-missing");
+		const pi = fakePi();
+		await mod.createStatusbar(pi, { loadTps: async () => Promise.reject(new Error("tps.js not found")) });
+		const ctx = fakeCtx(new FakeProvider());
+		fire(pi, "session_start", ctx);
+		await run(pi, ctx);
+		expect(ctx.ui.notify).toHaveBeenCalledTimes(1);
+		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("tps.js not found"), "warning");
 	});
 });
