@@ -46,6 +46,11 @@ export async function loadBuiltinTps(packageDir: string): Promise<TpsFactory> {
  * one notice repeats its text with the ⏱ line below. It is sent on agent_settled, which senpi emits only
  * after every agent_end handler (the builtin's notify among them) has finished. When the builtin cannot
  * be loaded nothing is shown, so the engine's own TPS line is never touched.
+ *
+ * senpi 2026.11.3-3 (omo 5.1.61) pauses a goal until a provider limit resets from the goal extension's own
+ * agent_settled handler: it arms the `providerRetry` continuation timer (goal_continuation_timer_state) and then
+ * posts "Goal paused until ..." as an info notice (goal/monitor-continuation.js afterAgentSettled). Ours would
+ * replace that notice, so a run whose settle arms that timer shows no time line.
  */
 export function trackRunTime(
 	pi: any,
@@ -84,6 +89,12 @@ export function trackRunTime(
 	};
 
 	for (const name of FORWARDED) pi.on(name, (event: unknown, ctx: unknown) => forward(name, event, ctx));
+
+	if (typeof pi.events?.on === "function") {
+		pi.events.on("goal_continuation_timer_state", (data: any) => {
+			if (data?.armed === true && data.kind === "providerRetry") pending = undefined;
+		});
+	}
 
 	pi.on("agent_start", () => {
 		startedAt = now();

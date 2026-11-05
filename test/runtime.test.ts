@@ -6,7 +6,16 @@ const TPS_TEXT = "TPS 42.0 tok/s. Cache hit 75.0%, 3.0s";
 
 function fakePi() {
 	const handlers = new Map<string, Array<(event: unknown, ctx: any) => unknown>>();
+	const channels = new Map<string, Array<(data: unknown) => unknown>>();
 	return {
+		events: {
+			on(channel: string, handler: (data: unknown) => unknown) {
+				channels.set(channel, [...(channels.get(channel) ?? []), handler]);
+			},
+			emit(channel: string, data: unknown) {
+				for (const handler of channels.get(channel) ?? []) handler(data);
+			},
+		},
 		on(name: string, handler: (event: unknown, ctx: any) => unknown) {
 			handlers.set(name, [...(handlers.get(name) ?? []), handler]);
 		},
@@ -79,6 +88,35 @@ describe("trackRunTime", () => {
 		const ctx = tuiCtx();
 		run(pi, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledTimes(1);
+		expect(ctx.ui.notify).toHaveBeenCalledWith(`${TPS_TEXT}\n⏱ 09:00:12 (12s)`, "info");
+	});
+
+	test("a settle that pauses the goal until a provider limit resets shows no time line, so senpi's pause notice stays", async () => {
+		const at = (s: number) => new Date(2026, 10, 5, 9, 0, s).getTime();
+		const { pi } = await setup({ times: [at(0), at(5), at(10), at(12)] });
+		const ctx = tuiCtx();
+		pi.fire("agent_start", {}, ctx);
+		pi.fire("agent_end", { messages: [] }, ctx);
+		// senpi's goal extension settles first: it arms the providerRetry timer, then posts "Goal paused until ..."
+		pi.events.emit("goal_continuation_timer_state", { armed: true, kind: "providerRetry", dueAtMs: 1 });
+		pi.fire("agent_settled", {}, ctx);
+		expect(ctx.ui.notify).not.toHaveBeenCalled();
+		// the next run is unaffected
+		pi.fire("agent_start", {}, ctx);
+		pi.fire("agent_end", { messages: [] }, ctx);
+		pi.fire("agent_settled", {}, ctx);
+		expect(ctx.ui.notify).toHaveBeenCalledTimes(1);
+		expect(ctx.ui.notify).toHaveBeenCalledWith(`${TPS_TEXT}\n⏱ 09:00:12 (2s)`, "info");
+	});
+
+	test("other goal timers keep the time line", async () => {
+		const { pi } = await setup();
+		const ctx = tuiCtx();
+		pi.fire("agent_start", {}, ctx);
+		pi.fire("agent_end", { messages: [] }, ctx);
+		pi.events.emit("goal_continuation_timer_state", { armed: true, kind: "monitor", dueAtMs: 1 });
+		pi.events.emit("goal_continuation_timer_state", { armed: false, kind: "providerRetry" });
+		pi.fire("agent_settled", {}, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(`${TPS_TEXT}\n⏱ 09:00:12 (12s)`, "info");
 	});
 
