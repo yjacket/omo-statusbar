@@ -25,6 +25,8 @@ Work in a worktree on a branch and land changes through a PR; the `test` check (
 - On reload senpi resets the footer, so the wrapper must be put back on the new provider.
 - `ui.notify(text, "info")` (`showStatus`) overwrites the status line right above it, so a second notice replaces the builtin TPS line. runtime.ts runs a private instance of senpi's builtin `tps.js` (resolved like resource-loader: `<packageDir>/core/...` or `<packageDir>/dist/core/extensions/builtin/tps.js`) and sends one `TPS ...\n⏱ ...` notice.
 - `agent-session` awaits every extension's `agent_end` handler before it emits `agent_settled`, so the notice sent on `agent_settled` always lands after the builtin's.
+- senpi 2026.11.3-3 (omo 5.1.61): the goal extension's `agent_settled` handler arms the `providerRetry` timer (`goal_continuation_timer_state` on `pi.events`) and then posts an info `Goal paused until ...` notice. runtime.ts drops that run's time line when it sees the timer armed, so the pause notice is not replaced.
+- senpi 2026.11.5-1 (omo 5.1.62): an exhausted fallback chain also arms `providerRetry`, but posts no pause notice; that `agent_settled` event carries `fallbackExhausted`, and runtime.ts keeps the time line for it.
 
 ## Invariants
 
