@@ -51,6 +51,10 @@ export async function loadBuiltinTps(packageDir: string): Promise<TpsFactory> {
  * agent_settled handler: it arms the `providerRetry` continuation timer (goal_continuation_timer_state) and then
  * posts "Goal paused until ..." as an info notice (goal/monitor-continuation.js afterAgentSettled). Ours would
  * replace that notice, so a run whose settle arms that timer shows no time line.
+ *
+ * senpi 2026.11.5-1 (omo 5.1.62) also arms `providerRetry` when the run's fallback chain ran out on limits, and that
+ * path posts no pause notice (goal/monitor-continuation.js #parkUntilLadderReset). Its agent_settled event carries
+ * `fallbackExhausted`, so such a settle keeps the time line.
  */
 export function trackRunTime(
 	pi: any,
@@ -65,6 +69,7 @@ export function trackRunTime(
 	let tps: Map<string, Handler> | undefined;
 	let startedAt: number | undefined;
 	let pending: string | undefined;
+	let providerRetryArmed = false;
 
 	const fail = (error: unknown) => {
 		tps = undefined;
@@ -92,13 +97,14 @@ export function trackRunTime(
 
 	if (typeof pi.events?.on === "function") {
 		pi.events.on("goal_continuation_timer_state", (data: any) => {
-			if (data?.armed === true && data.kind === "providerRetry") pending = undefined;
+			if (data?.armed === true && data.kind === "providerRetry") providerRetryArmed = true;
 		});
 	}
 
 	pi.on("agent_start", () => {
 		startedAt = now();
 		pending = undefined;
+		providerRetryArmed = false;
 	});
 
 	pi.on("agent_end", (event: unknown, ctx: any) => {
@@ -119,10 +125,12 @@ export function trackRunTime(
 		pending = [tpsText, `⏱ ${clockText(end)} (${durationText(end - start)})`].filter(Boolean).join("\n");
 	});
 
-	pi.on("agent_settled", (_event: unknown, ctx: any) => {
+	pi.on("agent_settled", (event: any, ctx: any) => {
 		const text = pending;
+		const pauseNotice = providerRetryArmed && event?.fallbackExhausted === undefined;
 		pending = undefined;
-		if (text === undefined) return;
+		providerRetryArmed = false;
+		if (text === undefined || pauseNotice) return;
 		try {
 			ctx.ui.notify(text, "info");
 		} catch {
@@ -133,6 +141,7 @@ export function trackRunTime(
 	pi.on("session_shutdown", () => {
 		startedAt = undefined;
 		pending = undefined;
+		providerRetryArmed = false;
 	});
 
 	return loaded;

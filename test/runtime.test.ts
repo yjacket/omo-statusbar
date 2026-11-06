@@ -109,6 +109,17 @@ describe("trackRunTime", () => {
 		expect(ctx.ui.notify).toHaveBeenCalledWith(`${TPS_TEXT}\n⏱ 09:00:12 (2s)`, "info");
 	});
 
+	test("a settle whose fallback chain ran out keeps the time line: senpi posts no pause notice on that path", async () => {
+		const { pi } = await setup();
+		const ctx = tuiCtx();
+		pi.fire("agent_start", {}, ctx);
+		pi.fire("agent_end", { messages: [] }, ctx);
+		// senpi 2026.11.5-1 arms providerRetry for an exhausted fallback ladder without "Goal paused until ..."
+		pi.events.emit("goal_continuation_timer_state", { armed: true, kind: "providerRetry", dueAtMs: 1 });
+		pi.fire("agent_settled", { fallbackExhausted: { resumeAt: 1 } }, ctx);
+		expect(ctx.ui.notify).toHaveBeenCalledWith(`${TPS_TEXT}\n⏱ 09:00:12 (12s)`, "info");
+	});
+
 	test("other goal timers keep the time line", async () => {
 		const { pi } = await setup();
 		const ctx = tuiCtx();

@@ -84,7 +84,7 @@ Keys are stored exactly as the extensions set them, leading spaces included. If 
 - If another extension installs its own footer with `setFooter`, the capture at start-up can reset it.
 - It only works in the interactive TUI.
 - The time line needs a run that started in this session: a run that was already going when you typed `/reload` gets none. If another notice appears between the TPS line and the end of the run, the TPS text shows up a second time under it.
-- When omo pauses a goal until a usage limit resets, that run gets no time line, so omo's `Goal paused until ...` notice stays on screen.
+- When omo pauses a goal with a `Goal paused until ...` notice, that run gets no time line, so the notice stays on screen.
 - `omo-cache` only follows the clock. It cannot see a keep-alive ping that refreshed the cache while the session was idle, or a Claude subscription dropping to a 5-minute TTL past its usage limits.
 
 ## Development
