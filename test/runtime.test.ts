@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
-import { clockText, durationText, tpsModulePath, trackRunTime } from "../extension/statusbar/runtime.ts";
+import { clockText, durationText, providerRetryModulePath, type RetryAt, tpsModulePath, trackRunTime } from "../extension/statusbar/runtime.ts";
 
 const TPS_TEXT = "TPS 42.0 tok/s. Cache hit 75.0%, 3.0s";
 
@@ -37,13 +37,14 @@ function fakeTps(text: string | null = TPS_TEXT, seen: string[] = []) {
 	};
 }
 
-async function setup(options: { tps?: () => Promise<any>; enabled?: boolean; times?: number[] } = {}) {
+async function setup(options: { tps?: () => Promise<any>; retryAt?: RetryAt; enabled?: boolean; times?: number[] } = {}) {
 	const pi = fakePi();
 	const times = options.times ?? [new Date(2026, 9, 31, 9, 0, 0).getTime(), new Date(2026, 9, 31, 9, 0, 12).getTime()];
 	const onError = mock((_message: string) => {});
 	await trackRunTime(pi, {
 		enabled: () => options.enabled ?? true,
 		loadTps: options.tps ?? fakeTps(),
+		...(options.retryAt ? { loadRetryAt: async () => options.retryAt as RetryAt } : {}),
 		onError,
 		now: () => times.shift() as number,
 	});
@@ -80,6 +81,7 @@ test("tpsModulePath resolves like senpi's resource-loader: flat package first, t
 	const flat = join(root, "core", "extensions", "builtin", "tps.js");
 	expect(tpsModulePath(root, (path) => path === flat)).toBe(flat);
 	expect(tpsModulePath(root, () => false)).toBe(join(root, "dist", "core", "extensions", "builtin", "tps.js"));
+	expect(providerRetryModulePath(root, () => false)).toBe(join(root, "dist", "core", "extensions", "builtin", "goal", "provider-retry.js"));
 });
 
 describe("trackRunTime", () => {
@@ -118,6 +120,30 @@ describe("trackRunTime", () => {
 		pi.events.emit("goal_continuation_timer_state", { armed: true, kind: "providerRetry", dueAtMs: 1 });
 		pi.fire("agent_settled", { fallbackExhausted: { resumeAt: 1 } }, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(`${TPS_TEXT}\n⏱ 09:00:12 (12s)`, "info");
+	});
+
+	test("an armed providerRetry whose refusal named no reset keeps the time line: senpi posts no pause notice then", async () => {
+		const seen: unknown[][] = [];
+		const { pi } = await setup({ retryAt: (messages) => (seen.push([...messages]), undefined) });
+		const ctx = tuiCtx();
+		const refusal = { role: "assistant", stopReason: "error", providerDiagnostic: { category: "unknown", httpStatus: 429 } };
+		pi.fire("agent_start", {}, ctx);
+		pi.fire("agent_end", { messages: [refusal] }, ctx);
+		// senpi 2026.11.11 arms providerRetry for every limit refusal, a bare 429 included
+		pi.events.emit("goal_continuation_timer_state", { armed: true, kind: "providerRetry", dueAtMs: 1 });
+		pi.fire("agent_settled", {}, ctx);
+		expect(seen).toEqual([[refusal]]);
+		expect(ctx.ui.notify).toHaveBeenCalledWith(`${TPS_TEXT}\n⏱ 09:00:12 (12s)`, "info");
+	});
+
+	test("an armed providerRetry whose refusal named a reset drops the time line", async () => {
+		const { pi } = await setup({ retryAt: (_messages, now) => now + 60_000 });
+		const ctx = tuiCtx();
+		pi.fire("agent_start", {}, ctx);
+		pi.fire("agent_end", { messages: [] }, ctx);
+		pi.events.emit("goal_continuation_timer_state", { armed: true, kind: "providerRetry", dueAtMs: 1 });
+		pi.fire("agent_settled", {}, ctx);
+		expect(ctx.ui.notify).not.toHaveBeenCalled();
 	});
 
 	test("other goal timers keep the time line", async () => {
