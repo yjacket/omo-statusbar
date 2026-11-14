@@ -3,7 +3,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { loadBuiltinTps, tpsModulePath } from "../../extension/statusbar/runtime.ts";
+import { loadBuiltinTps, loadProviderRetryAt, tpsModulePath } from "../../extension/statusbar/runtime.ts";
 
 const omoBin = process.env.OMO_BIN;
 const candidates = [
@@ -38,4 +38,14 @@ clock = 1000;
 handlers.get("message_end")?.({ message }, ctx);
 handlers.get("agent_end")?.({ messages: [message] }, ctx);
 
-console.log(JSON.stringify({ path: tpsModulePath(packageDir), notices }));
+// senpi's goal providerRetryAt: a refusal that names its reset, and a bare 429 that names none.
+const retryAt = await loadProviderRetryAt(packageDir);
+const now = Date.now();
+const refusal = (providerDiagnostic: object) => [{ role: "assistant", content: [], stopReason: "error", errorMessage: "429", providerDiagnostic }];
+const retry = {
+	named: retryAt(refusal({ category: "rate_limit", resetsAt: now + 3_600_000 }), now) ?? null,
+	bare: retryAt(refusal({ category: "unknown", httpStatus: 429 }), now) ?? null,
+	now,
+};
+
+console.log(JSON.stringify({ path: tpsModulePath(packageDir), notices, retry }));

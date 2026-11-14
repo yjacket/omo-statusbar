@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 type Handler = (event: any, ctx: any) => unknown;
 export type TpsFactory = (pi: { on(name: string, handler: Handler): void }) => void;
+/** senpi's goal `providerRetryAt(messages, now)`: the reset a provider refusal named, or undefined. */
+export type RetryAt = (messages: readonly unknown[], now: number) => number | undefined;
 
 const FORWARDED = ["agent_start", "message_start", "message_update", "message_end"] as const;
 
@@ -36,6 +38,18 @@ export async function loadBuiltinTps(packageDir: string): Promise<TpsFactory> {
 	return factory;
 }
 
+/** senpi's goal provider-retry module, next to the tps module. */
+export function providerRetryModulePath(packageDir: string, exists: (path: string) => boolean = existsSync): string {
+	return join(dirname(tpsModulePath(packageDir, exists)), "goal", "provider-retry.js");
+}
+
+export async function loadProviderRetryAt(packageDir: string): Promise<RetryAt> {
+	const path = providerRetryModulePath(packageDir);
+	const retryAt = (await import(pathToFileURL(path).href)).providerRetryAt;
+	if (typeof retryAt !== "function") throw new Error(`${path} has no providerRetryAt`);
+	return retryAt;
+}
+
 /**
  * Puts `⏱ HH:MM:SS (duration)` under the per-run TPS line: the run's local end time and its wall-clock
  * length from agent_start to agent_end. Screen only: it goes through ui.notify, which neither the session
@@ -55,12 +69,18 @@ export async function loadBuiltinTps(packageDir: string): Promise<TpsFactory> {
  * senpi 2026.11.5-1 (omo 5.1.62) also arms `providerRetry` when the run's fallback chain ran out on limits, and that
  * path posts no pause notice (goal/monitor-continuation.js #parkUntilLadderReset). Its agent_settled event carries
  * `fallbackExhausted`, so such a settle keeps the time line.
+ *
+ * The pause notice follows only when the refusal named a reset (`providerRetryAt`). senpi 2026.11.11 (omo 5.1.70) arms
+ * `providerRetry` for every usage or rate limit refusal, a bare 429 with no reset included, and posts nothing then;
+ * such a settle keeps the time line too. When senpi's provider-retry module cannot be loaded, every armed settle
+ * drops the time line as before.
  */
 export function trackRunTime(
 	pi: any,
 	options: {
 		enabled: () => boolean;
 		loadTps: () => Promise<TpsFactory>;
+		loadRetryAt?: () => Promise<RetryAt>;
 		onError: (message: string) => void;
 		now?: () => number;
 	},
@@ -70,6 +90,26 @@ export function trackRunTime(
 	let startedAt: number | undefined;
 	let pending: string | undefined;
 	let providerRetryArmed = false;
+	let endMessages: readonly unknown[] = [];
+	let retryAt: RetryAt | undefined;
+	const retryLoaded = options.loadRetryAt?.().then(
+		(fn) => {
+			retryAt = fn;
+		},
+		() => {
+			// an older or reshaped senpi: every armed providerRetry settle drops the time line
+		},
+	);
+
+	// Does senpi post "Goal paused until ..." for this settle? Only for a refusal that named a reset.
+	const pauseNoticeFollows = () => {
+		if (!retryAt) return true;
+		try {
+			return retryAt(endMessages, Date.now()) !== undefined;
+		} catch {
+			return true;
+		}
+	};
 
 	const fail = (error: unknown) => {
 		tps = undefined;
@@ -120,6 +160,7 @@ export function trackRunTime(
 		});
 		const start = startedAt;
 		startedAt = undefined;
+		endMessages = Array.isArray((event as any)?.messages) ? (event as any).messages : [];
 		if (!tps || start === undefined || !ctx?.hasUI || ctx.mode !== "tui" || !options.enabled()) return;
 		const end = now();
 		pending = [tpsText, `⏱ ${clockText(end)} (${durationText(end - start)})`].filter(Boolean).join("\n");
@@ -127,9 +168,10 @@ export function trackRunTime(
 
 	pi.on("agent_settled", (event: any, ctx: any) => {
 		const text = pending;
-		const pauseNotice = providerRetryArmed && event?.fallbackExhausted === undefined;
+		const pauseNotice = providerRetryArmed && event?.fallbackExhausted === undefined && pauseNoticeFollows();
 		pending = undefined;
 		providerRetryArmed = false;
+		endMessages = [];
 		if (text === undefined || pauseNotice) return;
 		try {
 			ctx.ui.notify(text, "info");
@@ -144,5 +186,5 @@ export function trackRunTime(
 		providerRetryArmed = false;
 	});
 
-	return loaded;
+	return Promise.all([loaded, retryLoaded]).then(() => undefined);
 }
