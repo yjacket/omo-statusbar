@@ -9,7 +9,10 @@ test("compat: the installed senpi's builtin tps loads and gives one single-line 
 	const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
 	expect(stderr).toBe("");
 	expect(code).toBe(0);
-	const { path, notices } = JSON.parse(stdout.trim().split("\n").at(-1) as string);
+	const { path, notices, retry } = JSON.parse(stdout.trim().split("\n").at(-1) as string);
 	expect(path.replaceAll("\\", "/")).toEndWith("/core/extensions/builtin/tps.js");
 	expect(notices).toEqual(["TPS 100.0 tok/s. Cache hit 75.0%, 1.0s"]);
+	// the goal's providerRetryAt decides whether senpi posts "Goal paused until ..."
+	expect(retry.named).toBe(retry.now + 3_600_000);
+	expect(retry.bare).toBeNull();
 }, 60_000);

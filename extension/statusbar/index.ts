@@ -4,7 +4,7 @@ import { arrangeStatuses, type Config, emptyConfig, mergeKeys } from "./arrange.
 import { configPath, loadConfig, readablePath, saveConfig } from "./config.ts";
 import { GIT_STATUS_KEY, gitStatusText, readChangeCount } from "./git.ts";
 import { type PickerState, StatusPicker } from "./picker.ts";
-import { loadBuiltinTps, type TpsFactory, trackRunTime } from "./runtime.ts";
+import { loadBuiltinTps, loadProviderRetryAt, type RetryAt, type TpsFactory, trackRunTime } from "./runtime.ts";
 
 const PATCH = Symbol.for("omo-statusbar.patch");
 const EDITOR_OVERLAY = { width: "96%", maxHeight: "80%", minWidth: 40, margin: 1 } as const;
@@ -20,7 +20,12 @@ function errorText(error: unknown): string {
 
 export function createStatusbar(
 	pi: any,
-	deps: { agentDir?: () => string; loadTps?: () => Promise<TpsFactory>; now?: () => number } = {},
+	deps: {
+		agentDir?: () => string;
+		loadTps?: () => Promise<TpsFactory>;
+		loadRetryAt?: () => Promise<RetryAt>;
+		now?: () => number;
+	} = {},
 ): Promise<void> {
 	trackCacheStatus(pi);
 	let config: Config = emptyConfig();
@@ -257,6 +262,7 @@ export function createStatusbar(
 	return trackRunTime(pi, {
 		enabled: () => config.runTime !== false,
 		loadTps: deps.loadTps ?? (() => loadBuiltinTps(getPackageDir())),
+		loadRetryAt: deps.loadRetryAt ?? (() => loadProviderRetryAt(getPackageDir())),
 		now: deps.now,
 		onError: (message) => {
 			runTimeError = message;

@@ -27,6 +27,7 @@ Work in a worktree on a branch and land changes through a PR; the `test` check (
 - `agent-session` awaits every extension's `agent_end` handler before it emits `agent_settled`, so the notice sent on `agent_settled` always lands after the builtin's.
 - senpi 2026.11.3-3 (omo 5.1.61): the goal extension's `agent_settled` handler arms the `providerRetry` timer (`goal_continuation_timer_state` on `pi.events`) and then posts an info `Goal paused until ...` notice. runtime.ts drops that run's time line when it sees the timer armed, so the pause notice is not replaced.
 - senpi 2026.11.5-1 (omo 5.1.62): an exhausted fallback chain also arms `providerRetry`, but posts no pause notice; that `agent_settled` event carries `fallbackExhausted`, and runtime.ts keeps the time line for it.
+- senpi 2026.11.11 (omo 5.1.70): every usage or rate limit refusal arms `providerRetry`, a bare 429 included, but the pause notice is posted only when goal `provider-retry.js` `providerRetryAt(messages, now)` finds a reset. runtime.ts loads that module next to `tps.js` and keeps the time line when it finds none; if the module cannot be loaded, every armed settle drops the line as before.
 
 ## Invariants
 
